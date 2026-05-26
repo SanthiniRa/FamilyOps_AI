@@ -19,7 +19,12 @@ class Settings(BaseSettings):
     supabase_service_key: str = ""
     database_url: str = ""
 
-    # OpenAI
+    # Google Gemini
+    google_api_key: str = ""
+    google_model: str = "gemini-1.5-flash"
+    google_embedding_model: str = "models/embedding-001"
+
+    # OpenAI (optional fallback)
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
     openai_embedding_model: str = "text-embedding-3-small"

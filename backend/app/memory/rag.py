@@ -1,5 +1,4 @@
 from typing import List, Dict, Any, Optional
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_core.documents import Document
 from app.core.config import settings
@@ -7,17 +6,30 @@ from app.core.logging import logger
 import json
 
 
-class HouseholdRAG:
-    def __init__(self):
-        self.embeddings = OpenAIEmbeddings(
+def _build_embeddings():
+    if settings.google_api_key:
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        return GoogleGenerativeAIEmbeddings(
+            model=settings.google_embedding_model,
+            google_api_key=settings.google_api_key,
+        )
+    elif settings.openai_api_key:
+        from langchain_openai import OpenAIEmbeddings
+        return OpenAIEmbeddings(
             model=settings.openai_embedding_model,
             api_key=settings.openai_api_key,
-        ) if settings.openai_api_key else None
+        )
+    return None
+
+
+class HouseholdRAG:
+    def __init__(self):
+        self.embeddings = _build_embeddings()
         self.vector_store = None
 
     async def init(self):
         if not self.embeddings:
-            logger.warning("rag.no_openai_key", message="RAG disabled - no OpenAI API key")
+            logger.warning("rag.no_ai_key", message="RAG disabled - set GOOGLE_API_KEY or OPENAI_API_KEY")
             return
 
         try:

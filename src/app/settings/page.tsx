@@ -61,9 +61,20 @@ export default function SettingsPage() {
             ]}
           />
           <IntegrationCard
+            icon={<Bot className="h-5 w-5 text-blue-500" />}
+            title="Google Gemini API (Recommended)"
+            description="Powers all AI agents, embeddings, and LangGraph orchestration via Gemini 1.5 Flash."
+            status="configure"
+            fields={[
+              { label: "API Key", placeholder: "AIza...", env: "GOOGLE_API_KEY" },
+              { label: "Model", placeholder: "gemini-1.5-flash", env: "GOOGLE_MODEL" },
+              { label: "Embedding Model", placeholder: "models/embedding-001", env: "GOOGLE_EMBEDDING_MODEL" },
+            ]}
+          />
+          <IntegrationCard
             icon={<Bot className="h-5 w-5 text-indigo-500" />}
-            title="OpenAI API"
-            description="Powers all AI agents, embeddings, and LangGraph orchestration."
+            title="OpenAI API (Optional fallback)"
+            description="Used if GOOGLE_API_KEY is not set. Supports GPT-4o and text-embedding-3-small."
             status="configure"
             fields={[
               { label: "API Key", placeholder: "sk-...", env: "OPENAI_API_KEY" },

@@ -1,13 +1,30 @@
 from typing import Any, Dict, List, Optional, TypedDict, Annotated
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from app.core.config import settings
 from app.core.logging import logger
 from app.events.bus import event_bus
 import operator
 from datetime import datetime
+
+
+def _build_llm():
+    if settings.google_api_key:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=settings.google_model,
+            google_api_key=settings.google_api_key,
+            temperature=0.1,
+        )
+    elif settings.openai_api_key:
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=settings.openai_model,
+            api_key=settings.openai_api_key,
+            temperature=0.1,
+        )
+    return None
 
 
 class AgentState(TypedDict):
@@ -22,11 +39,7 @@ class AgentState(TypedDict):
 
 class FamilyOpsOrchestrator:
     def __init__(self):
-        self.llm = ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key,
-            temperature=0.1,
-        ) if settings.openai_api_key else None
+        self.llm = _build_llm()
         self.agents: Dict[str, Any] = {}
         self.graph = self._build_graph()
 
