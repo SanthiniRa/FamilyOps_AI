@@ -52,7 +52,8 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/v1/calendar/oauth/callback"
 
     class Config:
-        env_file = ".env"
+        # Check workspace root first, then backend/ directory
+        env_file = ("../.env", ".env")
         env_file_encoding = "utf-8"
         extra = "ignore"
 

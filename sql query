@@ -1,0 +1,278 @@
+-- ============================================================
+--  FamilyOps AI — Supabase Schema
+--  Run in: Supabase Dashboard → SQL Editor → New Query
+-- ============================================================
+
+-- Extensions
+create extension if not exists "uuid-ossp";
+create extension if not exists vector;           -- pgvector for RAG embeddings
+
+-- ============================================================
+-- 1. family_members
+-- ============================================================
+create table if not exists family_members (
+  id                  text primary key default gen_random_uuid()::text,
+  name                varchar(100)  not null,
+  email               varchar(255)  unique,
+  role                varchar(50)   default 'member',
+  avatar_url          varchar(500),
+  preferences         jsonb         default '{}',
+  dietary_restrictions jsonb        default '[]',
+  created_at          timestamptz   default now(),
+  updated_at          timestamptz   default now()
+);
+
+-- ============================================================
+-- 2. tasks
+-- ============================================================
+create table if not exists tasks (
+  id              text primary key default gen_random_uuid()::text,
+  title           varchar(255) not null,
+  description     text,
+  status          varchar(50)  default 'pending',
+  priority        varchar(20)  default 'medium',
+  due_date        timestamptz,
+  assignee_id     text         references family_members(id) on delete set null,
+  created_by      text,
+  tags            jsonb        default '[]',
+  extra_data      jsonb        default '{}',
+  agent_generated boolean      default false,
+  created_at      timestamptz  default now(),
+  updated_at      timestamptz  default now()
+);
+
+-- ============================================================
+-- 3. calendar_events
+-- ============================================================
+create table if not exists calendar_events (
+  id              text primary key default gen_random_uuid()::text,
+  title           varchar(255) not null,
+  description     text,
+  start_time      timestamptz  not null,
+  end_time        timestamptz  not null,
+  location        varchar(500),
+  all_day         boolean      default false,
+  attendees       jsonb        default '[]',
+  google_event_id varchar(255),
+  recurrence      jsonb,
+  reminders       jsonb        default '[]',
+  color           varchar(20),
+  extra_data      jsonb        default '{}',
+  created_at      timestamptz  default now(),
+  updated_at      timestamptz  default now()
+);
+
+-- ============================================================
+-- 4. grocery_lists
+-- ============================================================
+create table if not exists grocery_lists (
+  id              text primary key default gen_random_uuid()::text,
+  name            varchar(255) not null,
+  status          varchar(50)  default 'active',
+  store           varchar(255),
+  scheduled_date  timestamptz,
+  total_estimate  float,
+  created_at      timestamptz  default now(),
+  updated_at      timestamptz  default now()
+);
+
+-- ============================================================
+-- 5. grocery_items  (depends on grocery_lists)
+-- ============================================================
+create table if not exists grocery_items (
+  id              text primary key default gen_random_uuid()::text,
+  name            varchar(255) not null,
+  category        varchar(100),
+  quantity        float        default 1,
+  unit            varchar(50),
+  checked         boolean      default false,
+  list_id         text         references grocery_lists(id) on delete cascade,
+  added_by        text,
+  price_estimate  float,
+  notes           text,
+  created_at      timestamptz  default now()
+);
+
+-- ============================================================
+-- 6. meal_plans
+-- ============================================================
+create table if not exists meal_plans (
+  id                  text primary key default gen_random_uuid()::text,
+  week_start          timestamptz not null,
+  week_end            timestamptz not null,
+  meals               jsonb       default '{}',
+  nutritional_summary jsonb       default '{}',
+  generated_by_ai     boolean     default false,
+  preferences_used    jsonb       default '{}',
+  created_at          timestamptz default now(),
+  updated_at          timestamptz default now()
+);
+
+-- ============================================================
+-- 7. recipes
+-- ============================================================
+create table if not exists recipes (
+  id           text primary key default gen_random_uuid()::text,
+  name         varchar(255) not null,
+  description  text,
+  ingredients  jsonb        not null default '[]',
+  instructions jsonb        not null default '[]',
+  prep_time    integer,
+  cook_time    integer,
+  servings     integer,
+  cuisine      varchar(100),
+  tags         jsonb        default '[]',
+  dietary_info jsonb        default '{}',
+  nutrition    jsonb        default '{}',
+  image_url    varchar(500),
+  source_url   varchar(500),
+  embedding    vector(768),          -- Google embedding-001 = 768 dims
+  created_at   timestamptz  default now()
+);
+
+-- ============================================================
+-- 8. reminders  (depends on family_members)
+-- ============================================================
+create table if not exists reminders (
+  id          text primary key default gen_random_uuid()::text,
+  title       varchar(255) not null,
+  body        text,
+  remind_at   timestamptz  not null,
+  recurrence  varchar(50),
+  member_id   text         references family_members(id) on delete set null,
+  channel     varchar(50)  default 'app',
+  status      varchar(50)  default 'pending',
+  extra_data  jsonb        default '{}',
+  created_at  timestamptz  default now()
+);
+
+-- ============================================================
+-- 9. household_memories
+-- ============================================================
+create table if not exists household_memories (
+  id         text primary key default gen_random_uuid()::text,
+  content    text        not null,
+  category   varchar(100),
+  tags       jsonb       default '[]',
+  source     varchar(100),
+  importance float       default 0.5,
+  embedding  vector(768),             -- used for semantic RAG search
+  extra_data jsonb       default '{}',
+  created_at timestamptz default now(),
+  expires_at timestamptz
+);
+
+-- ============================================================
+-- 10. emails
+-- ============================================================
+create table if not exists emails (
+  id           text primary key default gen_random_uuid()::text,
+  message_id   varchar(500) unique,
+  subject      varchar(500),
+  sender       varchar(255),
+  recipients   jsonb        default '[]',
+  body_text    text,
+  body_html    text,
+  received_at  timestamptz,
+  processed    boolean      default false,
+  category     varchar(100),
+  action_items jsonb        default '[]',
+  summary      text,
+  embedding    vector(768),
+  extra_data   jsonb        default '{}',
+  created_at   timestamptz  default now()
+);
+
+-- ============================================================
+-- 11. agent_runs
+-- ============================================================
+create table if not exists agent_runs (
+  id           text primary key default gen_random_uuid()::text,
+  agent_name   varchar(100) not null,
+  workflow_id  varchar(255),
+  status       varchar(50)  default 'running',
+  input_data   jsonb        default '{}',
+  output_data  jsonb        default '{}',
+  steps        jsonb        default '[]',
+  tokens_used  integer      default 0,
+  duration_ms  integer,
+  error        text,
+  started_at   timestamptz  default now(),
+  completed_at timestamptz
+);
+
+-- ============================================================
+-- 12. events  (audit / event-bus log)
+-- ============================================================
+create table if not exists events (
+  id         text primary key default gen_random_uuid()::text,
+  event_type varchar(100) not null,
+  source     varchar(100),
+  payload    jsonb        default '{}',
+  processed  boolean      default false,
+  created_at timestamptz  default now()
+);
+
+-- ============================================================
+-- Indexes
+-- ============================================================
+create index if not exists idx_tasks_status        on tasks(status);
+create index if not exists idx_tasks_assignee      on tasks(assignee_id);
+create index if not exists idx_tasks_due_date      on tasks(due_date);
+
+create index if not exists idx_events_start        on calendar_events(start_time);
+
+create index if not exists idx_grocery_items_list  on grocery_items(list_id);
+create index if not exists idx_grocery_lists_status on grocery_lists(status);
+
+create index if not exists idx_reminders_status    on reminders(status);
+create index if not exists idx_reminders_remind_at on reminders(remind_at);
+
+create index if not exists idx_memories_category   on household_memories(category);
+create index if not exists idx_memories_importance on household_memories(importance desc);
+
+create index if not exists idx_agent_runs_status   on agent_runs(status);
+create index if not exists idx_agent_runs_started  on agent_runs(started_at desc);
+
+create index if not exists idx_emails_processed    on emails(processed);
+create index if not exists idx_events_type         on events(event_type);
+
+-- pgvector indexes for semantic search (cosine similarity)
+create index if not exists idx_memories_embedding
+  on household_memories using ivfflat (embedding vector_cosine_ops)
+  with (lists = 100);
+
+create index if not exists idx_recipes_embedding
+  on recipes using ivfflat (embedding vector_cosine_ops)
+  with (lists = 100);
+
+-- ============================================================
+-- Auto-update updated_at trigger
+-- ============================================================
+create or replace function update_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace trigger trg_family_members_updated_at
+  before update on family_members
+  for each row execute function update_updated_at();
+
+create or replace trigger trg_tasks_updated_at
+  before update on tasks
+  for each row execute function update_updated_at();
+
+create or replace trigger trg_calendar_events_updated_at
+  before update on calendar_events
+  for each row execute function update_updated_at();
+
+create or replace trigger trg_grocery_lists_updated_at
+  before update on grocery_lists
+  for each row execute function update_updated_at();
+
+create or replace trigger trg_meal_plans_updated_at
+  before update on meal_plans
+  for each row execute function update_updated_at();
