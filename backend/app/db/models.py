@@ -207,7 +207,28 @@ class Email(Base):
     embedding = Column(JSON)
     extra_data = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+class UploadedImage(Base):
+    __tablename__ = "uploaded_images"
+    
+    id = Column(String, primary_key=True, default=gen_uuid)
+    family_id = Column(String)  # For multi-family support
+    image_url = Column(String(500))
+    storage_path = Column(String(500))  # Supabase storage path
+    analysis_result = Column(JSON)  # Food items detected
+    created_at = Column(DateTime, default=datetime.utcnow)
 
+class Payment(Base):
+    __tablename__ = "payments"
+    
+    id = Column(String, primary_key=True, default=gen_uuid)
+    description = Column(String(255))
+    amount = Column(Float)
+    due_date = Column(DateTime)
+    status = Column(String(50), default="pending")  # pending, paid, overdue
+    from_email = Column(String(255))  # School/hospital email
+    extracted_from_email_id = Column(String, ForeignKey("emails.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class AgentRun(Base):
     __tablename__ = "agent_runs"
