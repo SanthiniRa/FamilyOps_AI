@@ -132,6 +132,7 @@ class FamilyOpsOrchestrator:
         keywords = {
             "task": ["task", "todo", "chore", "assign", "complete", "finish"],
             "calendar": ["calendar", "event", "schedule", "appointment", "meeting"],
+            "payment": ["pay", "bill", "invoice", "charge", "payment"], 
             "grocery": ["grocery", "shopping", "buy", "store", "list", "food"],
             "meal": ["meal", "recipe", "dinner", "lunch", "breakfast", "cook", "eat"],
             "reminder": ["remind", "reminder", "alert", "notify", "alarm"],
@@ -307,6 +308,21 @@ class FamilyOpsOrchestrator:
         await self._finish(state)
         return state
 
+# Add payment agent
+async def _payment_agent_node(self, state: AgentState) -> AgentState:
+    state["tools_called"].append("payment_agent")
+    message = state["messages"][-1].content
+    
+    # Extract bill details from email context
+    bill_context = state["context"].get("bill_context", {})
+    context_text = f"Bill: {bill_context.get('description')} | Amount: {bill_context.get('amount')} | Due: {bill_context.get('due_date')}"
+    
+    reply = await self._call_llm(message, context_text, "Payment")
+    state["reply"] = reply
+    state["status"] = "completed"
+    await self._finish(state)
+    return state
+    
     # ─── Email Agent ────────────────────────────────────────────────────────────
 
     async def _email_agent_node(self, state: AgentState) -> AgentState:
