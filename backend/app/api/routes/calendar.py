@@ -123,3 +123,4 @@ async def upcoming_week(db: AsyncSession = Depends(get_db)):
          "end_time": e.end_time, "location": e.location}
         for e in events
     ]
+

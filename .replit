@@ -30,7 +30,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend && python -m uvicorn main:app --host localhost --port 8000 --reload"
-waitForPort = 8000
 
 [workflows.workflow.metadata]
 outputType = "console"
@@ -41,8 +40,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
+args = "npm install && npm run dev"
 
 [workflows.workflow.metadata]
 outputType = "webview"

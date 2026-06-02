@@ -69,6 +69,7 @@ class FamilyOpsOrchestrator:
         graph.add_node("router", self._router_node)
         graph.add_node("task_agent", self._task_agent_node)
         graph.add_node("calendar_agent", self._calendar_agent_node)
+        graph.add_node("payment_agent", self._payment_agent_node)
         graph.add_node("grocery_agent", self._grocery_agent_node)
         graph.add_node("meal_agent", self._meal_agent_node)
         graph.add_node("reminder_agent", self._reminder_agent_node)
@@ -84,6 +85,7 @@ class FamilyOpsOrchestrator:
             {
                 "task": "task_agent",
                 "calendar": "calendar_agent",
+                "payment": "payment_agent",
                 "grocery": "grocery_agent",
                 "meal": "meal_agent",
                 "reminder": "reminder_agent",
@@ -93,7 +95,7 @@ class FamilyOpsOrchestrator:
             }
         )
 
-        for node in ["task_agent", "calendar_agent", "grocery_agent", "meal_agent",
+        for node in ["task_agent", "payment_agent","calendar_agent", "grocery_agent", "meal_agent",
                      "reminder_agent", "memory_agent", "email_agent", "general_agent"]:
             graph.add_edge(node, END)
 
@@ -122,7 +124,7 @@ class FamilyOpsOrchestrator:
                 chain = prompt | self.llm
                 result = await chain.ainvoke({"message": message})
                 intent = result.content.strip().lower().split()[0]
-                valid = {"task", "calendar", "grocery", "meal", "reminder", "memory", "email", "general"}
+                valid = {"task", "calendar", "payment","grocery", "meal", "reminder", "memory", "email", "general"}
                 return intent if intent in valid else "general"
             except Exception as e:
                 logger.warning("orchestrator.intent_fallback", error=str(e))
@@ -308,20 +310,20 @@ class FamilyOpsOrchestrator:
         await self._finish(state)
         return state
 
-# Add payment agent
-async def _payment_agent_node(self, state: AgentState) -> AgentState:
-    state["tools_called"].append("payment_agent")
-    message = state["messages"][-1].content
-    
-    # Extract bill details from email context
-    bill_context = state["context"].get("bill_context", {})
-    context_text = f"Bill: {bill_context.get('description')} | Amount: {bill_context.get('amount')} | Due: {bill_context.get('due_date')}"
-    
-    reply = await self._call_llm(message, context_text, "Payment")
-    state["reply"] = reply
-    state["status"] = "completed"
-    await self._finish(state)
-    return state
+    # Add payment agent
+    async def _payment_agent_node(self, state: AgentState) -> AgentState:
+        state["tools_called"].append("payment_agent")
+        message = state["messages"][-1].content
+        
+        # Extract bill details from email context
+        bill_context = state["context"].get("bill_context", {})
+        context_text = f"Bill: {bill_context.get('description')} | Amount:                             {bill_context.get('amount')} | Due: {bill_context.get('due_date')}"
+        
+        reply = await self._call_llm(message, context_text, "Payment")
+        state["reply"] = reply
+        state["status"] = "completed"
+        await self._finish(state)
+        return state
     
     # ─── Email Agent ────────────────────────────────────────────────────────────
 

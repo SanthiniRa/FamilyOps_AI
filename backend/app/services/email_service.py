@@ -1,35 +1,70 @@
 from imap_tools import MailBox
-from app.db.models import Email
-import re
-from datetime import datetime
 
 class EmailProcessor:
-    def __init__(self, email_user: str, email_password: str):
-        self.email_user = email_user
-        self.email_password = email_password
-    
-    async def fetch_emails(self):
-        """Connect via IMAP and fetch unprocessed emails"""
-        with MailBox('imap.gmail.com').login(self.email_user, self.email_password) as mailbox:
-            for msg in mailbox.fetch():
-                yield {
-                    'message_id': msg.message_id,
-                    'subject': msg.subject,
-                    'sender': msg.from_,
-                    'body_text': msg.text,
-                    'received_at': msg.date
-                }
-    
-    async def extract_action_items(self, email_body: str) -> list:
-        """Use LLM to extract action items"""
-        prompt = f"""Extract action items from this email:
-        
-{email_body}
+def __init__(self, email_user: str, email_password: str):
+    self.email_user = email_user
+    self.email_password = email_password
 
-Return JSON: {{"actions": [...], "due_date": null, "assignee": null, "is_payment": bool}}"""
-        # Call your LLM here
-        
-    async def detect_payment_emails(self, subject: str, body: str) -> bool:
-        """Detect school bills, hospital invoices, etc."""
-        keywords = ['invoice', 'bill', 'payment due', 'tuition', 'hospital bill', 'statement']
-        return any(kw in (subject + body).lower() for kw in keywords)
+# ✅ FIXED: simple generator (NOT async)
+def fetch_emails(self):
+    with MailBox("imap.gmail.com").login(self.email_user, self.email_password) as mailbox:
+        for msg in mailbox.fetch():
+            yield {
+                "message_id": msg.message_id,
+                "subject": msg.subject or "",
+                "sender": msg.from_,
+                "body_text": msg.text or "",
+                "received_at": msg.date,
+            }
+
+import json
+import google.generativeai as genai
+
+# configure once (put in __init__ ideally)
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+class EmailProcessor:
+
+    async def extract_action_items(self, email_body: str):
+
+        prompt = f"""
+You are an AI assistant that extracts actionable tasks from emails.
+
+Return ONLY valid JSON in this format:
+{{
+  "actions": [
+    {{
+      "text": "task description",
+      "due_date": null
+    }}
+  ],
+  "is_payment": true/false
+}}
+
+Email:
+{email_body}
+"""
+
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        response = model.generate_content(prompt)
+
+        try:
+            data = json.loads(response.text)
+        except Exception:
+            # fallback safety parsing
+            return {
+                "actions": [],
+                "is_payment": self.detect_payment_emails("", email_body)
+            }
+
+        return data
+
+# ✅ keyword detection
+def detect_payment_emails(self, subject: str, body: str) -> bool:
+    keywords = [
+        "invoice", "bill", "payment due",
+        "school", "hospital", "statement", "fee"
+    ]
+    text = (subject + " " + body).lower()
+    return any(k in text for k in keywords)
