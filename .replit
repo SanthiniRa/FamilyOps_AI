@@ -29,7 +29,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend && python -m uvicorn main:app --host localhost --port 8000 --reload"
+args = "cd backend && python run.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
@@ -58,3 +58,9 @@ exposeLocalhost = true
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "cd backend && python -m uvicorn main:app --host localhost --port 8000 & npm start"]
 build = ["bash", "-c", "cd backend && pip install -q fastapi uvicorn sqlalchemy aiosqlite structlog openai langchain langchain-openai langchain-community langgraph; npm run build"]
+
+[userenv]
+
+[userenv.shared]
+EMAIL_PASSWORD = "nqde vqim ktjy wnkb"
+EMAIL_ADDRESS = "saradhsa05@gmail.com"

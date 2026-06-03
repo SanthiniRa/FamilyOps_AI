@@ -1,3 +1,11 @@
+from dotenv import load_dotenv
+from pathlib import Path
+import os
+
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path, override=True)
+
+print("BOOT MAIL_USER =", os.getenv("MAIL_USER"))
 import uvicorn
 from app.core.config import settings
 
