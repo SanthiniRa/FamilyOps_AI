@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 import asyncio
-
+import traceback
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
 from app.db.database import init_db
@@ -37,11 +37,9 @@ async def email_polling_loop():
             logger.info("email.polling.completed")
 
         except Exception as e:
-            logger.exception(
-                "email.polling.error",
-                error=str(e)
-            )
-
+            print("FULL ERROR:", repr(e))
+            traceback.print_exc()
+    
         await asyncio.sleep(300)  # 5 minutes
 
 

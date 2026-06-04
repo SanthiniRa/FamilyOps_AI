@@ -9,7 +9,8 @@ class EmailProcessor:
     def __init__(self, email_user: str, email_password: str):
         self.email_user = email_user
         self.email_password = email_password
-
+        print("FINAL IMAP USER:", repr(self.email_user))
+        print("FINAL IMAP PASS:", repr(self.email_password))
         genai.configure(
             api_key=os.getenv("GOOGLE_API_KEY")
         )
@@ -23,7 +24,7 @@ class EmailProcessor:
             for msg in mailbox.fetch():
 
                 yield {
-                    "message_id": msg.message_id,
+                    "message_id": msg.uid,
                     "subject": msg.subject or "",
                     "sender": msg.from_,
                     "body_text": msg.text or "",
@@ -55,7 +56,7 @@ class EmailProcessor:
         """
 
         model = genai.GenerativeModel(
-            "gemini-1.5-flash"
+            "gemini-2.5-flash"
         )
 
         response = model.generate_content(prompt)

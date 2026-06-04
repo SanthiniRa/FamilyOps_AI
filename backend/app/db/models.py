@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 
 Base = declarative_base()
@@ -42,8 +42,11 @@ class FamilyMember(Base):
     avatar_url = Column(String(500))
     preferences = Column(JSON, default=dict)
     dietary_restrictions = Column(JSON, default=list)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=
+                        datetime.now(timezone.utc), onupdate=
+                       datetime.now(timezone.utc))
 
     tasks = relationship("Task", back_populates="assignee", foreign_keys="Task.assignee_id")
     reminders = relationship("Reminder", back_populates="member")
@@ -57,14 +60,17 @@ class Task(Base):
     description = Column(Text)
     status = Column(String(50), default="pending")
     priority = Column(String(20), default="medium")
-    due_date = Column(DateTime)
+    due_date = Column(DateTime(timezone=True))
     assignee_id = Column(String, ForeignKey("family_members.id"))
     created_by = Column(String)
     tags = Column(JSON, default=list)
     extra_data = Column(JSON, default=dict)
     agent_generated = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=
+                        datetime.now(timezone.utc), onupdate=
+                       datetime.now(timezone.utc))
 
     assignee = relationship("FamilyMember", back_populates="tasks", foreign_keys=[assignee_id])
 
@@ -75,8 +81,8 @@ class CalendarEvent(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     title = Column(String(255), nullable=False)
     description = Column(Text)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
     location = Column(String(500))
     all_day = Column(Boolean, default=False)
     attendees = Column(JSON, default=list)
@@ -85,8 +91,11 @@ class CalendarEvent(Base):
     reminders = Column(JSON, default=list)
     color = Column(String(20))
     extra_data = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=
+                        datetime.now(timezone.utc), onupdate=
+                       datetime.now(timezone.utc))
 
 
 class GroceryItem(Base):
@@ -102,7 +111,8 @@ class GroceryItem(Base):
     added_by = Column(String)
     price_estimate = Column(Float)
     notes = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
 
     grocery_list = relationship("GroceryList", back_populates="items")
 
@@ -114,10 +124,13 @@ class GroceryList(Base):
     name = Column(String(255), nullable=False)
     status = Column(String(50), default="active")
     store = Column(String(255))
-    scheduled_date = Column(DateTime)
+    scheduled_date = Column(DateTime(timezone=True))
     total_estimate = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=
+                        datetime.now(timezone.utc), onupdate=
+                       datetime.now(timezone.utc))
 
     items = relationship("GroceryItem", back_populates="grocery_list")
 
@@ -132,8 +145,11 @@ class MealPlan(Base):
     nutritional_summary = Column(JSON, default=dict)
     generated_by_ai = Column(Boolean, default=False)
     preferences_used = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=
+                        datetime.now(timezone.utc), onupdate=
+                       datetime.now(timezone.utc))
 
 
 class Recipe(Base):
@@ -154,7 +170,8 @@ class Recipe(Base):
     image_url = Column(String(500))
     source_url = Column(String(500))
     embedding = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
 
 
 class Reminder(Base):
@@ -169,7 +186,8 @@ class Reminder(Base):
     channel = Column(String(50), default="app")
     status = Column(String(50), default="pending")
     extra_data = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
 
     member = relationship("FamilyMember", back_populates="reminders")
 
@@ -185,8 +203,9 @@ class HouseholdMemory(Base):
     importance = Column(Float, default=0.5)
     embedding = Column(JSON)
     extra_data = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
+    expires_at = Column(DateTime(timezone=True))
 
 
 class Email(Base):
@@ -198,15 +217,22 @@ class Email(Base):
     sender = Column(String(255))
     recipients = Column(JSON, default=list)
     body_text = Column(Text)
-    body_html = Column(Text)
-    received_at = Column(DateTime)
+
+    # ✅ FIX: single correct timezone-aware column
+    received_at = Column(DateTime(timezone=True), nullable=True)
+
     processed = Column(Boolean, default=False)
     category = Column(String(100))
     action_items = Column(JSON, default=list)
     summary = Column(Text)
     embedding = Column(JSON)
     extra_data = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ✅ FIX: proper callable default
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc)
+    )
     
 class UploadedImage(Base):
     __tablename__ = "uploaded_images"
@@ -216,7 +242,8 @@ class UploadedImage(Base):
     image_url = Column(String(500))
     storage_path = Column(String(500))  # Supabase storage path
     analysis_result = Column(JSON)  # Food items detected
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
 
 class Payment(Base):
     __tablename__ = "payments"
@@ -224,11 +251,12 @@ class Payment(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     description = Column(String(255))
     amount = Column(Float)
-    due_date = Column(DateTime)
+    due_date = Column(DateTime(timezone=True))
     status = Column(String(50), default="pending")  # pending, paid, overdue
     from_email = Column(String(255))  # School/hospital email
     extracted_from_email_id = Column(String, ForeignKey("emails.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
 
 class AgentRun(Base):
     __tablename__ = "agent_runs"
@@ -243,8 +271,9 @@ class AgentRun(Base):
     tokens_used = Column(Integer, default=0)
     duration_ms = Column(Integer)
     error = Column(Text)
-    started_at = Column(DateTime, default=datetime.utcnow)
-    completed_at = Column(DateTime)
+    started_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True))
 
 
 class Event(Base):
@@ -255,4 +284,5 @@ class Event(Base):
     source = Column(String(100))
     payload = Column(JSON, default=dict)
     processed = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=
+                       datetime.now(timezone.utc))

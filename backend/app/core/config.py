@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Google Gemini
     google_api_key: str = ""
-    google_model: str = "gemini-1.5-flash"
+    google_model: str = "gemini-2.5-flash"
     google_embedding_model: str = "models/embedding-001"
 
     # OpenAI (optional fallback)
