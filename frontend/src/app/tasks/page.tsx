@@ -1,158 +1,264 @@
 "use client";
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, CheckCircle, Circle, Filter } from "lucide-react";
+
+import { Plus, Trash2, CheckCircle, Circle } from "lucide-react";
 import { formatRelative, PRIORITY_COLORS, cn } from "@/lib/utils";
+
+type TaskStatus = "pending" | "in-progress" | "completed";
+type TaskPriority = "low" | "medium" | "high";
+
+type Task = {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date?: string;
+  agent_generated: boolean;
+};
+
+type TaskStats = {
+  total: number;
+  by_status: Record<string, number>;
+  by_priority: Record<string, number>;
+  overdue: number;
+};
+
+const FILTERS: TaskStatus[] = ["pending", "in-progress", "completed"];
 
 export default function TasksPage() {
   const qc = useQueryClient();
+
+  const [filterStatus, setFilterStatus] = useState<TaskStatus>("pending");
   const [newTitle, setNewTitle] = useState("");
-  const [priority, setPriority] = useState("medium");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [priority, setPriority] = useState<TaskPriority>("medium");
 
-  const { data: tasks = [], isLoading } = useQuery({
+  // -----------------------------
+  // TASK LIST (FIXED QUERY)
+  // -----------------------------
+  const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ["tasks", filterStatus],
-    queryFn: () => tasksApi.list(filterStatus ? { status: filterStatus } : undefined).then((r) => r.data),
+    queryFn: async () => {
+      const res = await tasksApi.list({ status: filterStatus });
+
+      console.log("API RESPONSE:", res.data); // DEBUG LINE (keep for now)
+
+      return res.data;
+    },
   });
 
-  const { data: stats } = useQuery({
+  // -----------------------------
+  // STATS
+  // -----------------------------
+  const { data: stats } = useQuery<TaskStats>({
     queryKey: ["task-stats"],
-    queryFn: () => tasksApi.stats().then((r) => r.data),
+    queryFn: async () => {
+      const res = await tasksApi.stats();
+      return res.data;
+    },
   });
 
+  // -----------------------------
+  // CREATE
+  // -----------------------------
   const createTask = useMutation({
-    mutationFn: (data: any) => tasksApi.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks"] }); qc.invalidateQueries({ queryKey: ["task-stats"] }); setNewTitle(""); },
+    mutationFn: (data: { title: string; priority: TaskPriority }) =>
+      tasksApi.create(data),
+
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      await qc.invalidateQueries({ queryKey: ["task-stats"] });
+      setNewTitle("");
+    },
   });
 
+  // -----------------------------
+  // UPDATE
+  // -----------------------------
   const updateTask = useMutation({
-    mutationFn: ({ id, data }: any) => tasksApi.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks"] }); qc.invalidateQueries({ queryKey: ["task-stats"] }); },
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      tasksApi.update(id, data),
+
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      await qc.invalidateQueries({ queryKey: ["task-stats"] });
+    },
   });
 
+  // -----------------------------
+  // DELETE
+  // -----------------------------
   const deleteTask = useMutation({
     mutationFn: (id: string) => tasksApi.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks"] }); qc.invalidateQueries({ queryKey: ["task-stats"] }); },
+
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      await qc.invalidateQueries({ queryKey: ["task-stats"] });
+    },
   });
 
+  // -----------------------------
+  // CREATE HANDLER
+  // -----------------------------
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    createTask.mutate({ title: newTitle, priority });
+
+    createTask.mutate({
+      title: newTitle,
+      priority,
+    });
   };
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-sm text-muted-foreground">Manage household tasks and assignments</p>
-        </div>
+      {/* HEADER */}
+      <div>
+        <h1 className="text-2xl font-bold">Tasks</h1>
+        <p className="text-sm text-muted-foreground">
+          Manage household tasks
+        </p>
       </div>
 
-      {/* Stats */}
+      {/* STATS */}
       {stats && (
         <div className="grid grid-cols-4 gap-4">
-          {[
-            { label: "Total", value: stats.total, color: "text-foreground" },
-            { label: "Pending", value: stats.by_status?.pending ?? 0, color: "text-blue-600" },
-            { label: "Completed", value: stats.by_status?.completed ?? 0, color: "text-green-600" },
-            { label: "Overdue", value: stats.overdue, color: "text-red-600" },
-          ].map((s) => (
-            <Card key={s.label}>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-                <p className={cn("text-2xl font-bold", s.color)}>{s.value}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <Card>
+            <CardContent className="pt-4">
+              <p>Total</p>
+              <p className="text-xl font-bold">{stats.total}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4">
+              <p>Pending</p>
+              <p className="text-xl font-bold">
+                {stats.by_status?.pending ?? 0}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4">
+              <p>Completed</p>
+              <p className="text-xl font-bold">
+                {stats.by_status?.completed ?? 0}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4">
+              <p>Overdue</p>
+              <p className="text-xl font-bold">{stats.overdue}</p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Add Task */}
+      {/* CREATE */}
       <Card>
         <CardContent className="pt-4">
           <form onSubmit={handleCreate} className="flex gap-2">
             <Input
-              placeholder="Add a new task..."
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="New task..."
               className="flex-1"
             />
+
             <select
               value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              onChange={(e) =>
+                setPriority(e.target.value as TaskPriority)
+              }
+              className="border rounded px-2"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
             </select>
-            <Button type="submit" disabled={createTask.isPending}>
-              <Plus className="mr-1 h-4 w-4" /> Add
+
+            <Button type="submit">
+              <Plus className="w-4 h-4 mr-1" />
+              Add
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      {/* Filter */}
+      {/* FILTER */}
       <div className="flex gap-2">
-        {["", "pending", "in-progress", "completed"].map((s) => (
+        {FILTERS.map((status) => (
           <Button
-            key={s}
-            variant={filterStatus === s ? "default" : "outline"}
+            key={status}
+            variant={filterStatus === status ? "default" : "outline"}
             size="sm"
-            onClick={() => setFilterStatus(s)}
+            onClick={() => setFilterStatus(status)}
           >
-            {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+            {status}
           </Button>
         ))}
       </div>
 
-      {/* Task List */}
+      {/* TASK LIST */}
       <div className="space-y-2">
         {isLoading ? (
-          <p className="text-center text-sm text-muted-foreground py-8">Loading tasks...</p>
+          <p>Loading...</p>
         ) : tasks.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No tasks found. Create one above!</p>
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No tasks found in "{filterStatus}"
             </CardContent>
           </Card>
         ) : (
-          tasks.map((task: any) => (
-            <Card key={task.id} className={cn(task.status === "completed" && "opacity-60")}>
+          tasks.map((task) => (
+            <Card key={task.id}>
               <CardContent className="flex items-center gap-3 py-3">
+                {/* TOGGLE */}
                 <button
-                  onClick={() => updateTask.mutate({ id: task.id, data: { status: task.status === "completed" ? "pending" : "completed" } })}
-                  className="shrink-0 text-muted-foreground hover:text-primary"
+                  onClick={() =>
+                    updateTask.mutate({
+                      id: task.id,
+                      data: {
+                        status:
+                          task.status === "completed"
+                            ? "pending"
+                            : "completed",
+                      },
+                    })
+                  }
                 >
-                  {task.status === "completed" ? <CheckCircle className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5" />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <p className={cn("text-sm font-medium", task.status === "completed" && "line-through text-muted-foreground")}>
-                    {task.title}
-                  </p>
-                  {task.due_date && (
-                    <p className="text-xs text-muted-foreground">{formatRelative(task.due_date)}</p>
+                  {task.status === "completed" ? (
+                    <CheckCircle className="text-green-500" />
+                  ) : (
+                    <Circle />
                   )}
+                </button>
+
+                {/* TITLE */}
+                <div className="flex-1">
+                  <p>{task.title}</p>
                 </div>
-                <Badge className={cn("border text-xs", PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS])}>
-                  {task.priority}
-                </Badge>
-                {task.agent_generated && <Badge variant="info" className="text-xs">AI</Badge>}
+
+                {/* PRIORITY */}
+                <Badge>{task.priority}</Badge>
+
+                {/* DELETE */}
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={() => deleteTask.mutate(task.id)}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               </CardContent>
             </Card>

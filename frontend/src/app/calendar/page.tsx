@@ -38,7 +38,7 @@ export default function CalendarPage() {
   });
 
   const getEventsForDay = (day: Date) =>
-    events.filter((e: any) => isSameDay(new Date(e.start_time), day));
+    events.filter((e: any) => isSameDay(new Date(e.start_time).toUTCString(),day));
 
   const selectedDayEvents = selectedDate ? getEventsForDay(selectedDate) : [];
 

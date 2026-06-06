@@ -23,11 +23,25 @@ export const dashboardApi = {
 };
 
 export const tasksApi = {
-  list: (params?: Record<string, string>) => api.get("/tasks/", { params }),
+  list: (params?: { status?: string }) => {
+    const cleanParams: Record<string, string> = {};
+
+    if (params?.status) {
+      cleanParams.status = params.status;
+    }
+
+    return api.get("/tasks/", { params: cleanParams });
+  },
+
   create: (data: unknown) => api.post("/tasks/", data),
+
   get: (id: string) => api.get(`/tasks/${id}`),
-  update: (id: string, data: unknown) => api.patch(`/tasks/${id}`, data),
+
+  update: (id: string, data: unknown) =>
+    api.patch(`/tasks/${id}`, data),
+
   delete: (id: string) => api.delete(`/tasks/${id}`),
+
   stats: () => api.get("/tasks/stats/summary"),
 };
 

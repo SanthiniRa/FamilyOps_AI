@@ -54,7 +54,7 @@ async def list_recipes(
 async def create_recipe(recipe: RecipeCreate, db: AsyncSession = Depends(get_db)):
     db_recipe = Recipe(**recipe.model_dump())
     db.add(db_recipe)
-    await db.flush()
+    await db.commit()
     return {"id": db_recipe.id, "name": db_recipe.name, "created_at": db_recipe.created_at}
 
 
@@ -64,7 +64,7 @@ async def list_meal_plans(db: AsyncSession = Depends(get_db)):
     plans = result.scalars().all()
     return [
         {
-            "id": p.id, "week_start": p.week_start, "week_end": p.week_end,
+            "id": p.id, "week_start": p.week_start.date().isoformat(), "week_end": p.week_end,
             "meals": p.meals, "generated_by_ai": p.generated_by_ai,
             "nutritional_summary": p.nutritional_summary, "created_at": p.created_at,
         }
@@ -96,6 +96,22 @@ async def generate_meal_plan(data: MealPlanCreate, db: AsyncSession = Depends(ge
             for meal_type in meal_types
         }
 
+    existing = await db.execute(
+        select(MealPlan).where(MealPlan.week_start == week_start)
+    )
+
+    existing_plan = existing.scalar_one_or_none()
+
+    if existing_plan:
+        return {
+            "id": existing_plan.id,
+            "week_start": existing_plan.week_start,
+            "week_end": existing_plan.week_end,
+            "meals": existing_plan.meals,
+            "nutritional_summary": existing_plan.nutritional_summary,
+            "generated_by_ai": existing_plan.generated_by_ai,
+        }
+
     plan = MealPlan(
         week_start=week_start,
         week_end=week_end,
@@ -109,8 +125,10 @@ async def generate_meal_plan(data: MealPlanCreate, db: AsyncSession = Depends(ge
             "avg_fat_g": 65,
         },
     )
+
     db.add(plan)
-    await db.flush()
+    await db.commit()
+    await db.refresh(plan)
 
     await event_bus.publish("meal.plan.generated", {"plan_id": plan.id, "week_start": str(week_start)})
 

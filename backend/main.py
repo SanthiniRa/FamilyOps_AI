@@ -4,10 +4,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 import asyncio
 import traceback
+from app.workers.email_ingestor import ingest_emails
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
-from app.db.database import init_db
+from app.db.database import init_db, AsyncSessionLocal
+import os
 from app.events.bus import event_bus
+from app.workers.email_processor import process_emails
 
 from app.api.routes import (
     tasks,
@@ -21,28 +24,28 @@ from app.api.routes import (
     dashboard,
 )
 
-from app.workers.email_processor import process_emails
+# ============================================================
+# EMAIL PROCESSING (SAFE VERSION)
+# ============================================================
 
 async def email_polling_loop():
-    """
-    Continuously checks email inbox and processes
-    new emails every 5 minutes.
-    """
     while True:
-        try:
-            logger.info("email.polling.started")
-
-            await process_emails()
-
-            logger.info("email.polling.completed")
-
-        except Exception as e:
-            print("FULL ERROR:", repr(e))
-            traceback.print_exc()
-    
-        await asyncio.sleep(300)  # 5 minutes
-
-
+        async with AsyncSessionLocal() as db:
+            print("inside pooling")
+            # STEP 1: INGEST EMAILS FIRST
+            await ingest_emails(
+                db,
+                os.getenv("EMAIL_ADDRESS"),
+                os.getenv("EMAIL_PASSWORD")
+            )
+            print("after injestion")
+            # STEP 2: PROCESS THEM
+            await process_emails(db)
+            print("after process email")
+        await asyncio.sleep(300)
+# ============================================================
+# LIFESPAN
+# ============================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
@@ -52,32 +55,31 @@ async def lifespan(app: FastAPI):
         version=settings.app_version
     )
 
-    # Initialize database
+    # Initialize DB
     await init_db()
 
     # Start event bus
-    event_task = asyncio.create_task(
-        event_bus.start()
-    )
+    event_task = asyncio.create_task(event_bus.start())
 
-    # Process inbox immediately at startup
+    # ========================================================
+    # SAFE STARTUP EMAIL PROCESSING
+    # ========================================================
     try:
         logger.info("email.startup.processing")
 
-        await process_emails()
+        async with AsyncSessionLocal() as db:
+            await process_emails(db)
 
         logger.info("email.startup.completed")
 
     except Exception as e:
-        logger.exception(
-            "email.startup.error",
-            error=str(e)
-        )
+        logger.exception("email.startup.error", error=str(e))
 
-    # Start recurring email polling
-    email_task = asyncio.create_task(
-        email_polling_loop()
-    )
+    # ========================================================
+    # BACKGROUND LOOP (ONLY SAFE FOR REPLIT / VPS)
+    # ⚠️ DO NOT USE ON VERCEL
+    # ========================================================
+    email_task = asyncio.create_task(email_polling_loop())
 
     logger.info("familyops.ready")
 
@@ -102,6 +104,9 @@ async def lifespan(app: FastAPI):
     event_bus.stop()
 
 
+# ============================================================
+# FASTAPI APP
+# ============================================================
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
@@ -112,7 +117,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Middleware
+# ============================================================
+# MIDDLEWARE
+# ============================================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -126,7 +133,9 @@ app.add_middleware(
     minimum_size=1000,
 )
 
-# Routers
+# ============================================================
+# ROUTES
+# ============================================================
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(grocery.router, prefix="/api/v1")
@@ -138,6 +147,9 @@ app.include_router(family.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
 
 
+# ============================================================
+# ROOT
+# ============================================================
 @app.get("/")
 async def root():
     return {
