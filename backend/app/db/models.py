@@ -152,6 +152,33 @@ class GroceryItem(Base):
 
 
 # ============================================================
+# Pantry Inventory
+# ============================================================
+class PantryItem(Base):
+    __tablename__ = "pantry_items"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    name = Column(String(255), nullable=False)
+
+    category = Column(String(100))
+    quantity = Column(Float, default=1)
+    unit = Column(String(50))
+    
+    # Tracking
+    min_quantity = Column(Float, default=0)  # Reorder threshold
+    last_updated = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    expiry_date = Column(DateTime(timezone=True))
+    
+    # Metadata
+    location = Column(String(100))  # Kitchen shelf, fridge, etc.
+    notes = Column(Text)
+    price_per_unit = Column(Float)
+    
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ============================================================
 # Meal Plans
 # ============================================================
 class MealPlan(Base):
@@ -245,6 +272,25 @@ class HouseholdMemory(Base):
 
 
 # ============================================================
+# Memory
+class Memory(Base):
+    __tablename__ = "memories"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    content = Column(Text, nullable=False)
+    memory_type = Column(String(50), nullable=False, default="household")
+    embedding_id = Column(String(255), nullable=True)
+    memory_metadata = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow
+    )
+
+
+# ============================================================
 # Email
 # ============================================================
 class Email(Base):
@@ -286,6 +332,20 @@ class UploadedImage(Base):
     image_url = Column(String(500))
     storage_path = Column(String(500))
     analysis_result = Column(JSON)
+
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+
+class UploadedDocument(Base):
+    __tablename__ = "uploaded_documents"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    filename = Column(String(500), nullable=False)
+    content_type = Column(String(255), nullable=True)
+    storage_path = Column(String(1000), nullable=False)
+    extra_metadata = Column("metadata", JSON, default=dict)
+    source = Column(String(100), nullable=True)
+    ingested = Column(Boolean, default=False)
 
     created_at = Column(DateTime(timezone=True), default=utcnow)
 

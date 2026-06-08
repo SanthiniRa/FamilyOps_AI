@@ -1,0 +1,60 @@
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║         FamilyOps AI - LangGraph Multi-Agent Orchestration                │
+╠════════════════════════════════════════════════════════════════════════════╣
+║                                                                            │
+║                              START                                        │
+║                                ▼                                          │
+║                          ┌──────────────┐                                │
+║                          │ Router Node  │                                │
+║                          │   (Intent)   │                                │
+║                          └──────┬───────┘                                │
+║                 ┌────────────────┼─────────────────┐                     │
+║         ┌───────┴──────┬────────┴────────┬────────┴──────────┬────────┐ │
+║         ▼              ▼                 ▼                   ▼        ▼  │
+║    ┌─────────┐  ┌─────────┐  ┌──────────────┐  ┌──────────────┐ ┌─────┐ │
+║    │ Task    │  │Calendar │  │   Grocery    │  │ Meal Planner │ │...  │ │
+║    │ Agent   │  │ Agent   │  │   Agent      │  │   Agent      │ │     │ │
+║    └────┬────┘  └────┬────┘  └──────┬───────┘  └──────┬───────┘ └─────┘ │
+║         │            │              │                 │                  │
+║         └────────────┴──────────────┴─────────────────┘                  │
+║                      ▼                                                   │
+║              ┌─────────────────────┐                                     │
+║              │   LLM Processing    │                                     │
+║              │  (Claude/Gemini)    │                                     │
+║              └──────────┬──────────┘                                     │
+║                         ▼                                                │
+║              ┌─────────────────────┐                                     │
+║              │  Tool Execution     │                                     │
+║              │  (MCP Tools)        │                                     │
+║              └────┬────────────┬───┘                                     │
+║                   ▼            ▼                                         │
+║            ┌──────────┐   ┌──────────┐                                   │
+║            │Database  │   │ Vector   │                                   │
+║            │ (Tasks,  │   │ DB (RAG) │                                   │
+║            │ Events)  │   │(Qdrant)  │                                   │
+║            └──────────┘   └──────────┘                                   │
+║                         ▼                                                │
+║                       END                                               │
+║                                                                            │
+╚════════════════════════════════════════════════════════════════════════════╝
+
+AGENTS:
+  • Router: Intent classification (LLM + keyword fallback)
+  • Task Agent: Create and manage household tasks
+  • Calendar Agent: Schedule events and check availability
+  • Grocery Agent: Manage shopping lists
+  • Meal Agent: Plan meals with dietary restrictions
+  • Reminder Agent: Set recurring reminders
+  • Memory Agent: RAG-based knowledge retrieval
+  • Email Agent: Process and extract from emails
+  • Shopping Agent: Search products and compare prices
+  • Payment Agent: Handle bill payments
+  • General Agent: Conversational fallback
+
+STATE PERSISTENCE:
+  • Messages: Conversation history
+  • Intent: Detected intent category
+  • Context: Household data (tasks, events, etc.)
+  • Tools Called: Execution log
+  • Workflow ID: Unique execution trace

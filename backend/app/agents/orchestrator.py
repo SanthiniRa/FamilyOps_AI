@@ -40,7 +40,7 @@ Guidelines:
 """
 
 INTENT_PROMPT = """Classify this message into exactly one category.
-Categories: task, calendar, grocery, meal, reminder, memory, email, general
+Categories: task, calendar, grocery, meal, reminder, memory, email, shopping, general
 
 Message: {message}
 
@@ -75,6 +75,7 @@ class FamilyOpsOrchestrator:
         graph.add_node("reminder_agent", self._reminder_agent_node)
         graph.add_node("memory_agent", self._memory_agent_node)
         graph.add_node("email_agent", self._email_agent_node)
+        graph.add_node("shopping_agent", self._shopping_agent_node)
         graph.add_node("general_agent", self._general_agent_node)
 
         graph.set_entry_point("router")
@@ -91,12 +92,13 @@ class FamilyOpsOrchestrator:
                 "reminder": "reminder_agent",
                 "memory": "memory_agent",
                 "email": "email_agent",
+                "shopping": "shopping_agent",
                 "general": "general_agent",
             }
         )
 
         for node in ["task_agent", "payment_agent","calendar_agent", "grocery_agent", "meal_agent",
-                     "reminder_agent", "memory_agent", "email_agent", "general_agent"]:
+                     "reminder_agent", "memory_agent", "email_agent", "shopping_agent", "general_agent"]:
             graph.add_edge(node, END)
 
         return graph.compile()
@@ -124,7 +126,7 @@ class FamilyOpsOrchestrator:
                 chain = prompt | self.llm
                 result = await chain.ainvoke({"message": message})
                 intent = result.content.strip().lower().split()[0]
-                valid = {"task", "calendar", "payment","grocery", "meal", "reminder", "memory", "email", "general"}
+                valid = {"task", "calendar", "payment","grocery", "meal", "reminder", "memory", "email", "shopping", "general"}
                 return intent if intent in valid else "general"
             except Exception as e:
                 logger.warning("orchestrator.intent_fallback", error=str(e))
@@ -135,7 +137,8 @@ class FamilyOpsOrchestrator:
             "task": ["task", "todo", "chore", "assign", "complete", "finish"],
             "calendar": ["calendar", "event", "schedule", "appointment", "meeting"],
             "payment": ["pay", "bill", "invoice", "charge", "payment"], 
-            "grocery": ["grocery", "shopping", "buy", "store", "list", "food"],
+            "grocery": ["grocery", "list", "food"],
+            "shopping": ["shop", "shopping", "buy", "product", "price", "recommend", "store", "deal"],
             "meal": ["meal", "recipe", "dinner", "lunch", "breakfast", "cook", "eat"],
             "reminder": ["remind", "reminder", "alert", "notify", "alarm"],
             "memory": ["remember", "memory", "store", "note", "know"],
@@ -332,6 +335,18 @@ class FamilyOpsOrchestrator:
         message = state["messages"][-1].content
         context_text = "Email ingestion is available. Configure IMAP credentials in Settings to enable automatic email processing and action-item extraction."
         reply = await self._call_llm(message, context_text, "Email")
+        state["reply"] = reply
+        state["status"] = "completed"
+        await self._finish(state)
+        return state
+
+    # ─── Shopping Agent ─────────────────────────────────────────────────────────
+
+    async def _shopping_agent_node(self, state: AgentState) -> AgentState:
+        state["tools_called"].append("shopping_agent")
+        message = state["messages"][-1].content
+        context_text = "Shopping assistance available: search products, compare prices, get recommendations, find alternatives, track prices, and view favorites."
+        reply = await self._call_llm(message, context_text, "Shopping")
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)

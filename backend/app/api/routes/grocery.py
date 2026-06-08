@@ -76,7 +76,8 @@ async def list_grocery_lists(db: AsyncSession = Depends(get_db)):
 async def create_grocery_list(data: GroceryListCreate, db: AsyncSession = Depends(get_db)):
     gl = GroceryList(**data.model_dump())
     db.add(gl)
-    await db.flush()
+    await db.commit()
+    await db.refresh(gl)
     await event_bus.publish("grocery.list.created", {"list_id": gl.id, "name": gl.name})
     return {"id": gl.id, "name": gl.name, "status": gl.status, "created_at": gl.created_at}
 
@@ -106,7 +107,8 @@ async def add_item(list_id: str, item: GroceryItemCreate, db: AsyncSession = Dep
         raise HTTPException(status_code=404, detail="Grocery list not found")
     db_item = GroceryItem(list_id=list_id, **item.model_dump())
     db.add(db_item)
-    await db.flush()
+    await db.commit()
+    await db.refresh(db_item)
     await event_bus.publish("grocery.item.added", {"item_id": db_item.id, "list_id": list_id})
     return {"id": db_item.id, "name": db_item.name, "quantity": db_item.quantity}
 
@@ -154,5 +156,7 @@ async def generate_grocery_list_ai(list_id: str, db: AsyncSession = Depends(get_
         db.add(item)
         added.append(s["name"])
 
-    await db.flush()
+    
+    await db.commit()
+    await db.refresh(item)
     return {"message": f"Added {len(added)} AI-suggested items", "items": added}

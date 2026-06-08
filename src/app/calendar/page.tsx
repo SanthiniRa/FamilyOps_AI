@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Calendar, Clock, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths } from "date-fns";
 import { cn, formatRelative } from "@/lib/utils";
 
 export default function CalendarPage() {
@@ -38,7 +38,11 @@ export default function CalendarPage() {
   });
 
   const getEventsForDay = (day: Date) =>
-    events.filter((e: any) => isSameDay(new Date(e.start_time), day));
+    events.filter((e: any) => {
+      if (!e.start_time) return false;
+      const start = parseISO(e.start_time);
+      return isSameDay(start, day);
+    });
 
   const selectedDayEvents = selectedDate ? getEventsForDay(selectedDate) : [];
 
@@ -163,7 +167,7 @@ export default function CalendarPage() {
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(new Date(e.start_time), "h:mm a")} – {format(new Date(e.end_time), "h:mm a")}
+                    {format(parseISO(e.start_time), "h:mm a")} – {format(parseISO(e.end_time), "h:mm a")}
                   </p>
                   {e.location && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">

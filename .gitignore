@@ -24,3 +24,9 @@ node_modules/
 # Secrets
 .env.local
 .env.production
+
+# Stale duplicate folders and local cleanup artifacts
+frontend/
+main.py
+pyproject.toml
+sql query

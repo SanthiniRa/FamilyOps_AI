@@ -1,0 +1,126 @@
+{
+  "name": "FamilyOpsOrchestrator",
+  "version": "1.0",
+  "description": "LangGraph-based multi-agent orchestration for household management",
+  "entry_point": "router",
+  "exit_point": "END",
+  "nodes": [
+    {
+      "name": "router",
+      "type": "node",
+      "description": "Intent classification with LLM + keyword fallback"
+    },
+    {
+      "name": "task_agent",
+      "type": "node",
+      "description": "Create and manage household tasks"
+    },
+    {
+      "name": "calendar_agent",
+      "type": "node",
+      "description": "Schedule events and check availability"
+    },
+    {
+      "name": "grocery_agent",
+      "type": "node",
+      "description": "Manage grocery shopping lists"
+    },
+    {
+      "name": "meal_agent",
+      "type": "node",
+      "description": "Plan meals with dietary restrictions"
+    },
+    {
+      "name": "reminder_agent",
+      "type": "node",
+      "description": "Set recurring reminders"
+    },
+    {
+      "name": "memory_agent",
+      "type": "node",
+      "description": "RAG-based knowledge retrieval"
+    },
+    {
+      "name": "email_agent",
+      "type": "node",
+      "description": "Process and extract from emails"
+    },
+    {
+      "name": "shopping_agent",
+      "type": "node",
+      "description": "Search products and compare prices"
+    },
+    {
+      "name": "payment_agent",
+      "type": "node",
+      "description": "Handle bill payments"
+    },
+    {
+      "name": "general_agent",
+      "type": "node",
+      "description": "Conversational fallback agent"
+    }
+  ],
+  "edges": [
+    {
+      "from": "router",
+      "to": "task_agent",
+      "condition": "intent == 'task'"
+    },
+    {
+      "from": "router",
+      "to": "calendar_agent",
+      "condition": "intent == 'calendar'"
+    },
+    {
+      "from": "router",
+      "to": "grocery_agent",
+      "condition": "intent == 'grocery'"
+    },
+    {
+      "from": "router",
+      "to": "meal_agent",
+      "condition": "intent == 'meal'"
+    },
+    {
+      "from": "router",
+      "to": "reminder_agent",
+      "condition": "intent == 'reminder'"
+    },
+    {
+      "from": "router",
+      "to": "memory_agent",
+      "condition": "intent == 'memory'"
+    },
+    {
+      "from": "router",
+      "to": "email_agent",
+      "condition": "intent == 'email'"
+    },
+    {
+      "from": "router",
+      "to": "shopping_agent",
+      "condition": "intent == 'shopping'"
+    },
+    {
+      "from": "router",
+      "to": "payment_agent",
+      "condition": "intent == 'payment'"
+    },
+    {
+      "from": "router",
+      "to": "general_agent",
+      "condition": "intent == 'general'"
+    }
+  ],
+  "state_model": {
+    "messages": "List[BaseMessage]",
+    "agent_name": "str",
+    "workflow_id": "str",
+    "context": "Dict[str, Any]",
+    "tools_called": "List[str]",
+    "reply": "str",
+    "status": "str",
+    "error": "Optional[str]"
+  }
+}

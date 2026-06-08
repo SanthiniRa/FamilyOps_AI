@@ -18,3 +18,13 @@ AI-powered home assistant for:
 
 ## Architecture
 Frontend → API → AI → Supabase → Integrations
+
+## Production folder structure
+- `/src/` — active Next.js frontend application source
+- `/backend/` — FastAPI backend and AI service code
+- `frontend/` — stale duplicate frontend copy, not used in production
+- `main.py` — obsolete root script, kept only if needed for local experiments
+- `pyproject.toml` — obsolete Python packaging file; backend uses `/backend/requirements.txt`
+- celery -A app.core.celery_app.celery worker --loglevel=info (run in seperate terminal)
+- celery -A app.core.celery_app.celery beat --loglevel=info
+- export REDIS_URL=redis://localhost:6379/0

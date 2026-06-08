@@ -213,6 +213,31 @@ create table if not exists events (
   created_at timestamptz  default now()
 );
 
+CREATE TABLE uploaded_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    filename VARCHAR(500) NOT NULL,
+    content_type VARCHAR(255),
+    storage_path VARCHAR(1000) NOT NULL,
+
+    "metadata" JSONB DEFAULT '{}'::jsonb,
+    source VARCHAR(100),
+
+    ingested BOOLEAN DEFAULT FALSE,
+
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE memories (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    memory_type VARCHAR(50) NOT NULL DEFAULT 'household',
+    embedding_id VARCHAR(255),
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ============================================================
 -- Indexes
 -- ============================================================

@@ -77,6 +77,8 @@ async def update_member(
     for field, value in update.model_dump(exclude_unset=True).items():
         setattr(member, field, value)
     member.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(member)
     return {"id": member.id, "name": member.name, "role": member.role}
 
 

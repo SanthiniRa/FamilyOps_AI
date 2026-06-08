@@ -12,6 +12,8 @@ import os
 from app.events.bus import event_bus
 from app.workers.email_processor import process_emails
 
+from app.api.routes import briefing
+
 from app.api.routes import (
     tasks,
     grocery,
@@ -22,27 +24,9 @@ from app.api.routes import (
     family,
     agent,
     dashboard,
+    uploads,
 )
 
-# ============================================================
-# EMAIL PROCESSING (SAFE VERSION)
-# ============================================================
-
-async def email_polling_loop():
-    while True:
-        async with AsyncSessionLocal() as db:
-            print("inside pooling")
-            # STEP 1: INGEST EMAILS FIRST
-            await ingest_emails(
-                db,
-                os.getenv("EMAIL_ADDRESS"),
-                os.getenv("EMAIL_PASSWORD")
-            )
-            print("after injestion")
-            # STEP 2: PROCESS THEM
-            await process_emails(db)
-            print("after process email")
-        await asyncio.sleep(300)
 # ============================================================
 # LIFESPAN
 # ============================================================
@@ -61,9 +45,7 @@ async def lifespan(app: FastAPI):
     # Start event bus
     event_task = asyncio.create_task(event_bus.start())
 
-    # ========================================================
-    # SAFE STARTUP EMAIL PROCESSING
-    # ========================================================
+    # Run email pipeline ONCE at startup (safe init)
     try:
         logger.info("email.startup.processing")
 
@@ -75,26 +57,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.exception("email.startup.error", error=str(e))
 
-    # ========================================================
-    # BACKGROUND LOOP (ONLY SAFE FOR REPLIT / VPS)
-    # ⚠️ DO NOT USE ON VERCEL
-    # ========================================================
-    email_task = asyncio.create_task(email_polling_loop())
-
     logger.info("familyops.ready")
 
     yield
 
     logger.info("familyops.shutdown")
 
-    # Cancel background tasks
-    email_task.cancel()
     event_task.cancel()
-
-    try:
-        await email_task
-    except asyncio.CancelledError:
-        pass
 
     try:
         await event_task
@@ -102,8 +71,6 @@ async def lifespan(app: FastAPI):
         pass
 
     event_bus.stop()
-
-
 # ============================================================
 # FASTAPI APP
 # ============================================================
@@ -145,8 +112,8 @@ app.include_router(calendar.router, prefix="/api/v1")
 app.include_router(memory.router, prefix="/api/v1")
 app.include_router(family.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
-
-
+app.include_router(uploads.router, prefix="/api/v1")
+app.include_router(briefing.router)
 # ============================================================
 # ROOT
 # ============================================================

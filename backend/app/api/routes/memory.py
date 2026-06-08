@@ -1,106 +1,102 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from datetime import datetime
+
+from app.db.models import Memory
 from app.db.database import get_db
-from app.db.models import HouseholdMemory
-from app.events.bus import event_bus
+from app.memory.memory import memory_service
+from sqlalchemy import select
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 
 
 class MemoryCreate(BaseModel):
     content: str
-    category: Optional[str] = None
-    tags: List[str] = []
-    source: Optional[str] = "manual"
-    importance: float = 0.5
-    metadata: dict = {}
+    memory_type: str
+    metadata: Dict[str, Any] = {}
+
+
+class MemoryUpdate(BaseModel):
+    content: Optional[str] = None
+    memory_type: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class MemorySearch(BaseModel):
     query: str
     k: int = 5
-    category: Optional[str] = None
+    memory_type: Optional[str] = None
 
 
 @router.get("/", response_model=List[dict])
 async def list_memories(
-    category: Optional[str] = Query(None),
+    memory_type: Optional[str] = Query(None),
     limit: int = Query(50),
-    db: AsyncSession = Depends(get_db)
+    db=Depends(get_db),
 ):
-    q = select(HouseholdMemory)
-    if category:
-        q = q.where(HouseholdMemory.category == category)
-    q = q.order_by(HouseholdMemory.importance.desc(), HouseholdMemory.created_at.desc()).limit(limit)
+    q = select(Memory)
+    if memory_type:
+        q = q.where(Memory.memory_type == memory_type)
+    q = q.order_by(Memory.updated_at.desc()).limit(limit)
     result = await db.execute(q)
     memories = result.scalars().all()
     return [
         {
-            "id": m.id, "content": m.content, "category": m.category,
-            "tags": m.tags, "source": m.source, "importance": m.importance,
-            "created_at": m.created_at, "expires_at": m.expires_at,
+            "id": m.id,
+            "content": m.content,
+            "memory_type": m.memory_type,
+            "metadata": m.metadata,
+            "created_at": m.created_at,
+            "updated_at": m.updated_at,
         }
         for m in memories
     ]
 
 
-@router.post("/", status_code=201)
-async def store_memory(memory: MemoryCreate, db: AsyncSession = Depends(get_db)):
-    db_memory = HouseholdMemory(**memory.model_dump())
-    db.add(db_memory)
-    await db.flush()
-    await event_bus.publish("memory.stored", {
-        "memory_id": db_memory.id, "category": db_memory.category,
-        "source": db_memory.source,
-    })
+@router.post("/create", status_code=201)
+async def create_memory(memory: MemoryCreate):
+    created = await memory_service.create_memory(
+        content=memory.content,
+        memory_type=memory.memory_type,
+        metadata=memory.metadata,
+    )
     return {
-        "id": db_memory.id, "content": db_memory.content,
-        "category": db_memory.category, "created_at": db_memory.created_at,
+        "id": created.id,
+        "content": created.content,
+        "memory_type": created.memory_type,
+        "metadata": created.metadata,
+        "created_at": created.created_at,
+        "updated_at": created.updated_at,
     }
 
 
-@router.post("/search")
-async def search_memories(search: MemorySearch, db: AsyncSession = Depends(get_db)):
-    from app.memory.rag import rag
-    results = await rag.search_memories(search.query, k=search.k)
-    if not results:
-        q = select(HouseholdMemory)
-        if search.category:
-            q = q.where(HouseholdMemory.category == search.category)
-        q = q.order_by(HouseholdMemory.importance.desc()).limit(search.k)
-        db_result = await db.execute(q)
-        memories = db_result.scalars().all()
-        return {
-            "query": search.query,
-            "results": [
-                {"id": m.id, "content": m.content, "category": m.category,
-                 "importance": m.importance, "score": m.importance}
-                for m in memories
-            ],
-            "source": "database",
-        }
-    return {"query": search.query, "results": results, "source": "vector"}
+@router.get("/search")
+async def search_memories(
+    query: str = Query(...),
+    memory_type: Optional[str] = Query(None),
+    k: int = Query(5),
+):
+    results = await memory_service.search_memory(query=query, memory_type=memory_type, k=k)
+    return {"query": query, "results": results, "source": "qdrant"}
 
 
-@router.delete("/{memory_id}", status_code=204)
-async def delete_memory(memory_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(HouseholdMemory).where(HouseholdMemory.id == memory_id))
-    memory = result.scalar_one_or_none()
-    if not memory:
+@router.put("/{memory_id}")
+async def update_memory(memory_id: str, memory: MemoryUpdate):
+    try:
+        updated = await memory_service.update_memory(
+            memory_id=memory_id,
+            content=memory.content,
+            memory_type=memory.memory_type,
+            metadata=memory.metadata,
+        )
+    except ValueError:
         raise HTTPException(status_code=404, detail="Memory not found")
-    await db.delete(memory)
 
-
-@router.get("/categories/summary")
-async def memory_categories(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(HouseholdMemory))
-    memories = result.scalars().all()
-    categories = {}
-    for m in memories:
-        cat = m.category or "uncategorized"
-        categories[cat] = categories.get(cat, 0) + 1
-    return {"categories": categories, "total": len(memories)}
+    return {
+        "id": updated.id,
+        "content": updated.content,
+        "memory_type": updated.memory_type,
+        "metadata": updated.metadata,
+        "created_at": updated.created_at,
+        "updated_at": updated.updated_at,
+    }

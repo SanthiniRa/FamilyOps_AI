@@ -62,6 +62,29 @@ class RAGService:
         ids = await self.vector_store.aadd_documents([doc])
         return ids[0] if ids else None
 
+    def _extract_citation(self, metadata: Optional[Dict[str, Any]]):
+        if not metadata:
+            return ""
+
+        citation_parts = []
+        filename = metadata.get("filename")
+        if filename:
+            citation_parts.append(filename)
+
+        page = metadata.get("page")
+        if page is not None:
+            citation_parts.append(f"page {page}")
+
+        chunk_index = metadata.get("chunk_index")
+        if chunk_index is not None:
+            citation_parts.append(f"chunk {chunk_index}")
+
+        document_id = metadata.get("document_id")
+        if document_id:
+            citation_parts.append(f"doc:{document_id}")
+
+        return " | ".join(citation_parts)
+
     # ======================================================
     # HYBRID SEARCH (IMPORTANT IMPROVEMENT)
     # ======================================================
@@ -89,6 +112,7 @@ class RAGService:
                 "content": doc.page_content,
                 "metadata": doc.metadata,
                 "score": score,
+                "citation": self._extract_citation(doc.metadata),
             }
             for doc, score in results
         ]
@@ -103,7 +127,7 @@ class RAGService:
             return ""
 
         context = "\n\n".join(
-            f"[score={m['score']:.2f} | type={m['metadata'].get('type')}]\n{m['content']}"
+            f"[score={m['score']:.2f} | citation={m['citation']} | type={m['metadata'].get('type')}\n{m['content']}"
             for m in memories
         )
 
