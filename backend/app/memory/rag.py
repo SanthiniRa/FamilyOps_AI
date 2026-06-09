@@ -22,10 +22,15 @@ class RagWrapper:
 
     async def search_memories(self, query: str, k: int = 5, filter: Optional[Dict] = None) -> List[Dict[str, Any]]:
         # delegate to service.search which returns list of {content, metadata, score}
-        return await rag_service.search(query=query, memory_type=(filter.get("type") if filter else None), k=k)
+        return await rag_service.search(
+            query=query,
+            memory_type=(filter.get("type") if filter else None),
+            metadata_filter=filter,
+            k=k,
+        )
 
-    async def get_context_for_query(self, query: str, k: int = 3) -> str:
-        return await rag_service.build_context(query)
+    async def get_context_for_query(self, query: str, k: int = 3, memory_type: Optional[str] = None, metadata_filter: Optional[Dict[str, Any]] = None) -> str:
+        return await rag_service.build_context(query, memory_type=memory_type, metadata_filter=metadata_filter, k=k)
 
 
 rag = RagWrapper()

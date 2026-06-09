@@ -3,7 +3,7 @@ from app.db.models import Task, CalendarEvent, Email
 from app.services.rag_service import rag_service
 from datetime import datetime
 from sqlalchemy import insert
-
+from app.observability.metrics import TOOL_COUNTER
 
 class MCPTools:
 
@@ -18,6 +18,9 @@ class MCPTools:
                 status="pending",
                 agent_generated=True,
             )
+            TOOL_COUNTER.labels(
+                tool="create_task"
+            ).inc()
             db.add(task)
             await db.commit()
             await db.refresh(task)
@@ -35,6 +38,9 @@ class MCPTools:
                 end_time=datetime.fromisoformat(data["end_time"]),
                 location=data.get("location"),
             )
+            TOOL_COUNTER.labels(
+                tool="create_event"
+            ).inc()
             db.add(event)
             await db.commit()
             await db.refresh(event)
@@ -44,6 +50,9 @@ class MCPTools:
     # MEMORY TOOL (RAG)
     # =========================
     async def store_memory(self, data: dict):
+        TOOL_COUNTER.labels(
+                tool="store_memory"
+            ).inc()
         return await rag_service.store_memory(
             content=data["content"],
             memory_type=data.get("type", "email")
@@ -62,6 +71,9 @@ class MCPTools:
                 received_at=datetime.utcnow(),
                 processed=True,
             )
+            TOOL_COUNTER.labels(
+                tool="store_email"
+            ).inc()
             db.add(email)
             await db.commit()
             return {"status": "stored"}

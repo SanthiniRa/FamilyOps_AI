@@ -7,18 +7,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Bell, BellOff, Clock } from "lucide-react";
-import { formatRelative, cn } from "@/lib/utils";
+import { formatRelative } from "@/lib/utils";
 
 export default function RemindersPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState({ title: "", body: "", remind_at: "", recurrence: "", channel: "app" });
 
-  const { data: reminders = [], isLoading } = useQuery({
+  const {
+    data: reminders = [],
+    isLoading,
+    error: remindersError,
+  } = useQuery({
     queryKey: ["reminders"],
     queryFn: () => remindersApi.list().then((r) => r.data),
   });
 
-  const { data: todayReminders = [] } = useQuery({
+  const {
+    data: todayReminders = [],
+    error: todayError,
+  } = useQuery({
     queryKey: ["reminders-today"],
     queryFn: () => remindersApi.today().then((r) => r.data),
   });
@@ -44,8 +51,11 @@ export default function RemindersPage() {
     create.mutate({ ...form, remind_at: new Date(form.remind_at).toISOString() });
   };
 
-  const pending = reminders.filter((r: any) => r.status === "pending");
-  const dismissed = reminders.filter((r: any) => r.status === "dismissed");
+  const reminderList = Array.isArray(reminders) ? reminders : [];
+  const todayReminderList = Array.isArray(todayReminders) ? todayReminders : [];
+  const pending = reminderList.filter((r: any) => r.status === "pending");
+  const dismissed = reminderList.filter((r: any) => r.status === "dismissed");
+  const loadError = remindersError || todayError;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -54,17 +64,25 @@ export default function RemindersPage() {
         <p className="text-sm text-muted-foreground">Family alerts and scheduled notifications</p>
       </div>
 
+      {loadError && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="py-4 text-sm text-destructive">
+            We could not load all reminders. Check the backend connection and refresh the page.
+          </CardContent>
+        </Card>
+      )}
+
       {/* Today's reminders */}
-      {todayReminders.length > 0 && (
+      {todayReminderList.length > 0 && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base text-yellow-800">
-              <Bell className="h-4 w-4" /> Today's Reminders ({todayReminders.length})
+              <Bell className="h-4 w-4" /> Today's Reminders ({todayReminderList.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {todayReminders.map((r: any) => (
+              {todayReminderList.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between rounded-md bg-white border border-yellow-200 p-2">
                   <div>
                     <p className="text-sm font-medium">{r.title}</p>
@@ -137,6 +155,26 @@ export default function RemindersPage() {
           )}
         </div>
       </div>
+
+      {dismissed.length > 0 && (
+        <div>
+          <h2 className="mb-3 text-base font-semibold">Dismissed ({dismissed.length})</h2>
+          <div className="space-y-2">
+            {dismissed.map((r: any) => (
+              <Card key={r.id} className="border-dashed">
+                <CardContent className="flex items-center gap-3 py-3">
+                  <BellOff className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-muted-foreground">{r.title}</p>
+                    {r.body && <p className="text-xs text-muted-foreground">{r.body}</p>}
+                  </div>
+                  <Badge variant="outline" className="text-xs">dismissed</Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

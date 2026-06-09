@@ -120,7 +120,7 @@ async def task_stats(
 # LIST TASKS
 # ============================================================
 
-@router.get("/", response_model=List[TaskResponse])
+@router.get("", response_model=List[TaskResponse])
 async def list_tasks(
     status: Optional[str] = Query(None),
     priority: Optional[str] = Query(None),
@@ -154,7 +154,7 @@ async def list_tasks(
 # ============================================================
 
 @router.post(
-    "/",
+    "",
     response_model=TaskResponse,
     status_code=201
 )

@@ -36,7 +36,13 @@ async def upload_food_image(
 
     try:
         analysis = await vision_service.analyze_food_image(tmp_path)
-        recipes = await vision_service.suggest_recipes(analysis.get("foods", []))
+        food_items = analysis.get("foods", [])
+        available_foods = [
+            item.get("name") if isinstance(item, dict) else str(item)
+            for item in food_items
+            if item
+        ]
+        recipes = await vision_service.suggest_recipes(available_foods)
 
         img = UploadedImage(
             image_url="",
@@ -49,8 +55,10 @@ async def upload_food_image(
         await db.refresh(img)
 
         return {
-            "food_items": analysis,
-            "recipes": recipes,
+            "analysis": analysis,
+            "food_items": food_items,
+            "recipes": recipes.get("recipes", []),
+            "recipe_suggestions": recipes,
             "id": img.id
         }
 

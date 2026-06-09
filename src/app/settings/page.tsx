@@ -62,24 +62,24 @@ export default function SettingsPage() {
           />
           <IntegrationCard
             icon={<Bot className="h-5 w-5 text-blue-500" />}
-            title="Google Gemini API (Recommended)"
-            description="Powers all AI agents, embeddings, and LangGraph orchestration via Gemini 1.5 Flash."
+            title="OpenAI API (Primary)"
+            description="Powers all AI agents, embeddings, and LangGraph orchestration from your OPENAI_API_KEY and OPENAI_MODEL."
             status="configure"
             fields={[
-              { label: "API Key", placeholder: "AIza...", env: "GOOGLE_API_KEY" },
-              { label: "Model", placeholder: "gemini-1.5-flash", env: "GOOGLE_MODEL" },
-              { label: "Embedding Model", placeholder: "models/embedding-001", env: "GOOGLE_EMBEDDING_MODEL" },
+              { label: "API Key", placeholder: "sk-...", env: "OPENAI_API_KEY" },
+              { label: "Model", placeholder: "gpt-5.4-mini", env: "OPENAI_MODEL" },
+              { label: "Embedding Model", placeholder: "text-embedding-3-small", env: "OPENAI_EMBEDDING_MODEL" },
             ]}
           />
           <IntegrationCard
             icon={<Bot className="h-5 w-5 text-indigo-500" />}
-            title="OpenAI API (Optional fallback)"
-            description="Used if GOOGLE_API_KEY is not set. Supports GPT-4o and text-embedding-3-small."
+            title="Google Gemini API (Fallback)"
+            description="Used only if OPENAI_API_KEY is not available."
             status="configure"
             fields={[
-              { label: "API Key", placeholder: "sk-...", env: "OPENAI_API_KEY" },
-              { label: "Model", placeholder: "gpt-4o", env: "OPENAI_MODEL" },
-              { label: "Embedding Model", placeholder: "text-embedding-3-small", env: "OPENAI_EMBEDDING_MODEL" },
+              { label: "API Key", placeholder: "AIza...", env: "GOOGLE_API_KEY" },
+              { label: "Model", placeholder: "gemini-2.5-flash", env: "GOOGLE_MODEL" },
+              { label: "Embedding Model", placeholder: "models/embedding-001", env: "GOOGLE_EMBEDDING_MODEL" },
             ]}
           />
           <IntegrationCard

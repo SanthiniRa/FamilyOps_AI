@@ -1,7 +1,10 @@
 from collections import defaultdict
+from hashlib import sha256
 from typing import List, Dict, Any
 from sqlalchemy import select
 from app.db.models import Recipe
+from app.core.config import settings
+from app.observability.langfuse_client import start_ai_trace, end_ai_generation
 
 
 class MealPlanningService:
@@ -21,14 +24,33 @@ class MealPlanningService:
     ):
 
         recipes = await self._load_recipes(db)
+        warnings = []
 
         filtered = self._filter_recipes(recipes, preferences)
+        if recipes and not filtered:
+            warnings.append("No recipes matched preferences; using all available recipes.")
+            filtered = recipes
 
-        meals = await self._build_meals(filtered, preferences, llm_client)
+        if filtered:
+            meals = await self._build_meals(filtered, preferences, llm_client, week_start)
+        else:
+            warnings.append("No recipes found in the database; generated a fallback meal plan.")
+            meals = self._build_fallback_meals(preferences)
 
-        grocery_list = self._build_grocery_list(meals, recipes, pantry)
+        grocery_list = self._build_grocery_list(meals, recipes, pantry) if recipes else []
 
-        nutrition = self._calculate_nutrition(recipes, meals)
+        nutrition = self._calculate_nutrition(recipes, meals) if recipes else {
+            "avg_calories": 0,
+            "avg_protein_g": 0,
+            "avg_carbs_g": 0,
+            "avg_fat_g": 0,
+            "avg_fiber_g": 0,
+            "daily_avg_calories": 0,
+            "daily_avg_protein_g": 0,
+            "daily_avg_carbs_g": 0,
+            "daily_avg_fat_g": 0,
+            "daily_avg_fiber_g": 0,
+        }
 
         cost = self._estimate_cost(grocery_list)
 
@@ -37,7 +59,8 @@ class MealPlanningService:
             "shopping_list": grocery_list,
             "nutrition_summary": nutrition,
             "estimated_cost": cost,
-            "over_budget": budget is not None and cost > budget
+            "over_budget": budget is not None and cost > budget,
+            "warnings": warnings,
         }
 
     # ================================
@@ -74,8 +97,12 @@ class MealPlanningService:
 
             return True
 
-        # apply basic filtering
-        return [
+        filtered = [
+            r for r in recipes
+            if getattr(r, "ingredients", None) and valid(r)
+        ]
+
+        return filtered or [
             r for r in recipes
             if getattr(r, "ingredients", None)
         ]
@@ -83,7 +110,7 @@ class MealPlanningService:
     # ================================
     # MEAL GENERATION ENGINE
     # ================================
-    async def _build_meals(self, recipes, preferences, llm_client):
+    async def _build_meals(self, recipes, preferences, llm_client, week_start):
 
         days = [
             "monday", "tuesday", "wednesday",
@@ -94,6 +121,8 @@ class MealPlanningService:
 
         meals = {}
         used = set()
+        week_key = week_start.date().isoformat() if week_start else "unknown-week"
+        week_seed = int(sha256(week_key.encode("utf-8")).hexdigest()[:8], 16)
 
         def pick(i, pool):
             return pool[i % len(pool)]
@@ -115,14 +144,70 @@ class MealPlanningService:
                         day,
                         meal_type,
                         pool,
-                        preferences
+                        preferences,
+                        week_key,
                     )
                 else:
-                    recipe = pick(d_idx + m_idx, pool)
+                    recipe = pick(week_seed + d_idx * len(meal_types) + m_idx, pool)
 
                 meals[day][meal_type] = recipe.name
                 used.add(recipe.id)
 
+        return meals
+
+    def _build_fallback_meals(self, preferences):
+        vegetarian = "vegetarian" in set(preferences.get("dietary_restrictions", []))
+
+        breakfast_options = [
+            "Oatmeal with fruit",
+            "Greek yogurt with granola",
+            "Eggs and toast",
+            "Smoothie bowl",
+        ]
+        lunch_options = [
+            "Vegetable soup and sandwich",
+            "Hummus wrap with salad",
+            "Pasta salad",
+            "Rice bowl with vegetables",
+        ]
+        dinner_options = [
+            "Veggie pasta",
+            "Stir-fried vegetables with rice",
+            "Bean tacos",
+            "Baked potatoes with vegetables",
+        ]
+
+        if not vegetarian:
+            breakfast_options = [
+                "Oatmeal with fruit",
+                "Greek yogurt with granola",
+                "Eggs and toast",
+                "Breakfast burrito",
+            ]
+            lunch_options = [
+                "Chicken salad wrap",
+                "Turkey sandwich with fruit",
+                "Tuna pasta salad",
+                "Grilled cheese and tomato soup",
+            ]
+            dinner_options = [
+                "Chicken stir-fry with rice",
+                "Spaghetti with marinara",
+                "Taco bowls",
+                "Baked salmon with vegetables",
+            ]
+
+        meals = {}
+        days = [
+            "monday", "tuesday", "wednesday",
+            "thursday", "friday", "saturday", "sunday"
+        ]
+        for idx, day in enumerate(days):
+            meals[day] = {
+                "breakfast": breakfast_options[idx % len(breakfast_options)],
+                "lunch": lunch_options[idx % len(lunch_options)],
+                "dinner": dinner_options[idx % len(dinner_options)],
+            }
         return meals
 
     # ================================
@@ -134,12 +219,14 @@ class MealPlanningService:
         day,
         meal_type,
         recipes,
-        preferences
+        preferences,
+        week_key,
     ):
 
         prompt = {
             "day": day,
             "meal_type": meal_type,
+            "week_key": week_key,
             "preferences": preferences,
             "recipes": [
                 {
@@ -151,22 +238,60 @@ class MealPlanningService:
             ]
         }
 
-        response = await llm.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a meal planning AI. Pick the best recipe."
-                },
-                {
-                    "role": "user",
-                    "content": str(prompt)
-                }
-            ],
-            response_format={"type": "json_object"}
+        trace = start_ai_trace(
+            "meal.plan.recipe_selection",
+            input=prompt,
+            metadata={
+                "day": day,
+                "meal_type": meal_type,
+                "model": settings.openai_model,
+            },
         )
 
+        try:
+            response = await llm.chat.completions.create(
+                model=settings.openai_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a meal planning AI. Pick the best recipe and vary choices across weeks."
+                    },
+                    {
+                        "role": "user",
+                        "content": str(prompt)
+                    }
+                ],
+                response_format={"type": "json_object"}
+            )
+        except Exception as exc:
+            end_ai_generation(
+                trace,
+                name="meal.plan.recipe_selection",
+                model=settings.openai_model,
+                input=prompt,
+                output=None,
+                metadata={
+                    "day": day,
+                    "meal_type": meal_type,
+                },
+                level="ERROR",
+                status_message=str(exc),
+            )
+            raise
+
         data = response.choices[0].message.content
+        end_ai_generation(
+            trace,
+            name="meal.plan.recipe_selection",
+            model=settings.openai_model,
+            input=prompt,
+            output=data,
+            usage=response.usage.model_dump() if response.usage else None,
+            metadata={
+                "day": day,
+                "meal_type": meal_type,
+            },
+        )
 
         import json
         selected = json.loads(data)["recipe_name"]
@@ -257,14 +382,36 @@ class MealPlanningService:
                 count += 1
 
         if count == 0:
-            return total
+            return {
+                "avg_calories": 0,
+                "avg_protein_g": 0,
+                "avg_carbs_g": 0,
+                "avg_fat_g": 0,
+                "avg_fiber_g": 0,
+                "daily_avg_calories": 0,
+                "daily_avg_protein_g": 0,
+                "daily_avg_carbs_g": 0,
+                "daily_avg_fat_g": 0,
+                "daily_avg_fiber_g": 0,
+            }
+
+        avg_calories = round(total["calories"] / count, 2)
+        avg_protein_g = round(total["protein"] / count, 2)
+        avg_carbs_g = round(total["carbs"] / count, 2)
+        avg_fat_g = round(total["fat"] / count, 2)
+        avg_fiber_g = round(total["fiber"] / count, 2)
 
         return {
-            "daily_avg_calories": round(total["calories"] / count, 2),
-            "daily_avg_protein_g": round(total["protein"] / count, 2),
-            "daily_avg_carbs_g": round(total["carbs"] / count, 2),
-            "daily_avg_fat_g": round(total["fat"] / count, 2),
-            "daily_avg_fiber_g": round(total["fiber"] / count, 2),
+            "avg_calories": avg_calories,
+            "avg_protein_g": avg_protein_g,
+            "avg_carbs_g": avg_carbs_g,
+            "avg_fat_g": avg_fat_g,
+            "avg_fiber_g": avg_fiber_g,
+            "daily_avg_calories": avg_calories,
+            "daily_avg_protein_g": avg_protein_g,
+            "daily_avg_carbs_g": avg_carbs_g,
+            "daily_avg_fat_g": avg_fat_g,
+            "daily_avg_fiber_g": avg_fiber_g,
         }
 
     # ================================

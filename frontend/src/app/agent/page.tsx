@@ -73,6 +73,8 @@ export default function AgentPage() {
       setMessages((prev) => [...prev, agentMsg]);
       qc.invalidateQueries({ queryKey: ["agent-runs"] });
       qc.invalidateQueries({ queryKey: ["agent-stats"] });
+      qc.invalidateQueries({ queryKey: ["grocery-lists"] });
+      qc.invalidateQueries({ queryKey: ["meal-plans"] });
     },
     onError: () => {
       setMessages((prev) => [...prev, {
@@ -245,8 +247,16 @@ export default function AgentPage() {
 function formatAgentResponse(result: any): string {
   const { status, result: r } = result;
   if (status === "failed") return `I encountered an error: ${r?.error || "Unknown error"}. Please try again.`;
+  if (result?.reply?.trim()) return result.reply.trim();
   const intent = r?.context?.intent;
   const tools = r?.tools_called ?? [];
+  const resource = r?.context?.resource;
+  if (resource?.type === "grocery_list") {
+    return `Created grocery list "${resource.name}" with ${resource.item_count} items. Open the Grocery tab to review it.`;
+  }
+  if (resource?.type === "meal_plan") {
+    return `Created a meal plan for the requested week. Open the Meals tab to review it.`;
+  }
   if (tools.length > 0) {
     return `I've processed your request using the ${tools.join(", ")} agent(s). The task has been handled successfully! You can see the results in the relevant section of the app.`;
   }

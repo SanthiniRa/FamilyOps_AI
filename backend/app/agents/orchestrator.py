@@ -5,26 +5,86 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.core.config import settings
 from app.core.logging import logger
 from app.events.bus import event_bus
+from app.services.agent_actions import (
+    create_grocery_list_from_message,
+    create_meal_plan_from_message,
+)
+from app.observability.langfuse_client import start_ai_trace, end_ai_generation
+from app.services.openai_utils import (
+    is_openai_model_not_found_error,
+    openai_chat_model_candidates,
+)
 import operator
 from datetime import datetime
 
 
+def _build_google_llm(model_name: str):
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    return ChatGoogleGenerativeAI(
+        model=model_name,
+        google_api_key=settings.google_api_key,
+        temperature=0.3,
+    )
+
+
+def _build_openai_llm(model_name: Optional[str] = None):
+    from langchain_openai import ChatOpenAI
+    return ChatOpenAI(
+        model=model_name or settings.openai_model,
+        api_key=settings.openai_api_key,
+        temperature=0.3,
+    )
+
+
 def _build_llm():
-    if settings.google_api_key:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(
-            model=settings.google_model,
-            google_api_key=settings.google_api_key,
-            temperature=0.3,
-        )
-    elif settings.openai_api_key:
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key,
-            temperature=0.3,
-        )
+    if settings.openai_api_key:
+        return _build_openai_llm()
+    elif settings.google_api_key:
+        return _build_google_llm(settings.google_model)
     return None
+
+
+def _google_model_fallbacks(current_model: str) -> list[str]:
+    candidates = [
+        current_model,
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-pro",
+    ]
+    seen = set()
+    ordered = []
+    for model in candidates:
+        if model and model not in seen:
+            seen.add(model)
+            ordered.append(model)
+    return ordered
+
+
+def _is_missing_google_model_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return (
+        "model" in text
+        and (
+            "not found" in text
+            or "not supported" in text
+            or "invalid" in text
+            or "generatecontent" in text
+        )
+    )
+
+
+def _build_google_or_openai_fallback(provider: str, model_name: Optional[str] = None):
+    if provider == "openai" and settings.openai_api_key:
+        return _build_openai_llm(model_name or settings.openai_model)
+    if provider == "google" and settings.google_api_key:
+        return _build_google_llm(model_name or settings.google_model)
+    return None
+
+
+def _is_create_request(message: str, keywords: List[str]) -> bool:
+    lower = message.lower()
+    action_words = ("create", "make", "generate", "build", "set up", "prepare", "plan")
+    return any(word in lower for word in action_words) and any(keyword in lower for keyword in keywords)
 
 
 SYSTEM_PROMPT = """You are FamilyOps AI, a warm, practical household operations assistant.
@@ -61,6 +121,8 @@ class AgentState(TypedDict):
 class FamilyOpsOrchestrator:
     def __init__(self):
         self.llm = _build_llm()
+        self.llm_provider = "openai" if settings.openai_api_key else "google" if settings.google_api_key else None
+        self.llm_model = settings.openai_model if settings.openai_api_key else settings.google_model if settings.google_api_key else None
         self.graph = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
@@ -119,16 +181,80 @@ class FamilyOpsOrchestrator:
     def _route_to_agent(self, state: AgentState) -> str:
         return state["context"].get("intent", "general")
 
+    def _extract_total_tokens(self, usage: Any) -> int:
+        if usage is None:
+            return 0
+
+        if hasattr(usage, "model_dump"):
+            payload = usage.model_dump()
+        elif isinstance(usage, dict):
+            payload = dict(usage)
+        else:
+            return 0
+
+        total_tokens = payload.get("total_tokens")
+        if isinstance(total_tokens, (int, float)):
+            return int(total_tokens)
+
+        input_tokens = payload.get("input_tokens") or payload.get("prompt_tokens")
+        output_tokens = payload.get("output_tokens") or payload.get("completion_tokens")
+        if isinstance(input_tokens, (int, float)) or isinstance(output_tokens, (int, float)):
+            return int(input_tokens or 0) + int(output_tokens or 0)
+
+        if isinstance(payload.get("input"), (int, float)) or isinstance(payload.get("output"), (int, float)):
+            return int(payload.get("input") or 0) + int(payload.get("output") or 0)
+
+        return 0
+
+    def _record_tokens(self, state: AgentState, usage: Any) -> int:
+        tokens = self._extract_total_tokens(usage)
+        if tokens > 0:
+            context = state.setdefault("context", {})
+            context["tokens_used"] = int(context.get("tokens_used") or 0) + tokens
+        return tokens
+
     async def _detect_intent(self, message: str) -> str:
         if self.llm:
+            trace = start_ai_trace(
+                "orchestrator.intent",
+                input={"message": message},
+                metadata={
+                    "provider": self.llm_provider,
+                    "model": self.llm_model,
+                },
+            )
             try:
                 prompt = ChatPromptTemplate.from_template(INTENT_PROMPT)
                 chain = prompt | self.llm
                 result = await chain.ainvoke({"message": message})
                 intent = result.content.strip().lower().split()[0]
                 valid = {"task", "calendar", "payment","grocery", "meal", "reminder", "memory", "email", "shopping", "general"}
+                end_ai_generation(
+                    trace,
+                    name="orchestrator.intent",
+                    model=self.llm_model or settings.openai_model or settings.google_model,
+                    input={"message": message},
+                    output=intent,
+                    metadata={
+                        "provider": self.llm_provider,
+                        "model": self.llm_model,
+                    },
+                )
                 return intent if intent in valid else "general"
             except Exception as e:
+                end_ai_generation(
+                    trace,
+                    name="orchestrator.intent",
+                    model=self.llm_model or settings.openai_model or settings.google_model,
+                    input={"message": message},
+                    output=None,
+                    metadata={
+                        "provider": self.llm_provider,
+                        "model": self.llm_model,
+                    },
+                    level="ERROR",
+                    status_message=str(e),
+                )
                 logger.warning("orchestrator.intent_fallback", error=str(e))
 
         # Keyword fallback
@@ -149,21 +275,220 @@ class FamilyOpsOrchestrator:
                 return intent
         return "general"
 
-    async def _call_llm(self, user_message: str, context_text: str, agent_label: str) -> str:
+    async def _call_llm(self, user_message: str, context_text: str, agent_label: str, state: AgentState) -> str:
         if not self.llm:
             return (
-                f"⚠️ No AI key configured. Add **GOOGLE_API_KEY** to `backend/.env` to enable real responses.\n\n"
+                f"⚠️ No AI key configured. Add **OPENAI_API_KEY** to `backend/.env` to enable real responses.\n\n"
                 f"Your message was routed to the **{agent_label}** agent."
             )
+        trace = start_ai_trace(
+            f"orchestrator.{agent_label.lower()}",
+            input={
+                "context": context_text,
+                "message": user_message,
+            },
+            metadata={
+                "provider": self.llm_provider,
+                "model": self.llm_model,
+                "agent": agent_label,
+            },
+        )
+        messages = [
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=f"{context_text}\n\nUser: {user_message}" if context_text else user_message),
+        ]
         try:
-            messages = [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(content=f"{context_text}\n\nUser: {user_message}" if context_text else user_message),
-            ]
             response = await self.llm.ainvoke(messages)
+            usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", None)
+            self._record_tokens(state, usage)
+            end_ai_generation(
+                trace,
+                name=f"orchestrator.{agent_label.lower()}",
+                model=self.llm_model or settings.openai_model or settings.google_model,
+                input=[message.content for message in messages],
+                output=response.content,
+                usage=usage,
+                metadata={
+                    "provider": self.llm_provider,
+                    "model": self.llm_model,
+                    "agent": agent_label,
+                },
+            )
             return response.content
         except Exception as e:
+            if self.llm_provider == "openai" and settings.google_api_key:
+                try:
+                    fallback_llm = _build_google_or_openai_fallback("google", settings.google_model)
+                    if fallback_llm:
+                        response = await fallback_llm.ainvoke(messages)
+                        self.llm = fallback_llm
+                        self.llm_provider = "google"
+                        self.llm_model = settings.google_model
+                        usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", None)
+                        self._record_tokens(state, usage)
+                        end_ai_generation(
+                            trace,
+                            name=f"orchestrator.{agent_label.lower()}",
+                            model=self.llm_model,
+                            input=[message.content for message in messages],
+                            output=response.content,
+                            usage=usage,
+                            metadata={
+                                "provider": self.llm_provider,
+                                "model": self.llm_model,
+                                "agent": agent_label,
+                                "fallback": True,
+                            },
+                        )
+                        logger.warning(
+                            "orchestrator.google_fallback",
+                            requested_model=settings.openai_model,
+                            fallback_model=settings.google_model,
+                            error=str(e),
+                        )
+                        return response.content
+                except Exception as fallback_error:
+                    logger.warning(
+                        "orchestrator.google_fallback_failed",
+                        requested_model=settings.openai_model,
+                        fallback_model=settings.google_model,
+                        error=str(fallback_error),
+                    )
+
+            if self.llm_provider == "openai" and is_openai_model_not_found_error(e):
+                for model_name in openai_chat_model_candidates():
+                    if model_name == self.llm_model:
+                        continue
+                    try:
+                        fallback_llm = _build_openai_llm(model_name)
+                        response = await fallback_llm.ainvoke(messages)
+                        self.llm = fallback_llm
+                        self.llm_provider = "openai"
+                        self.llm_model = model_name
+                        usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", None)
+                        self._record_tokens(state, usage)
+                        end_ai_generation(
+                            trace,
+                            name=f"orchestrator.{agent_label.lower()}",
+                            model=self.llm_model,
+                            input=[message.content for message in messages],
+                            output=response.content,
+                            usage=usage,
+                            metadata={
+                                "provider": self.llm_provider,
+                                "model": self.llm_model,
+                                "agent": agent_label,
+                                "fallback": True,
+                            },
+                        )
+                        logger.warning(
+                            "orchestrator.openai_model_fallback",
+                            requested_model=settings.openai_model,
+                            fallback_model=model_name,
+                        )
+                        return response.content
+                    except Exception as fallback_error:
+                        logger.warning(
+                            "orchestrator.openai_model_fallback_failed",
+                            requested_model=settings.openai_model,
+                            fallback_model=model_name,
+                            error=str(fallback_error),
+                        )
+
+            if self.llm_provider == "google" and _is_missing_google_model_error(e):
+                for model_name in _google_model_fallbacks(settings.google_model):
+                    if model_name == self.llm_model:
+                        continue
+                    try:
+                        fallback_llm = _build_google_or_openai_fallback("google", model_name)
+                        if not fallback_llm:
+                            continue
+                        response = await fallback_llm.ainvoke(messages)
+                        self.llm = fallback_llm
+                        self.llm_model = model_name
+                        usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", None)
+                        self._record_tokens(state, usage)
+                        end_ai_generation(
+                            trace,
+                            name=f"orchestrator.{agent_label.lower()}",
+                            model=self.llm_model,
+                            input=[message.content for message in messages],
+                            output=response.content,
+                            usage=usage,
+                            metadata={
+                                "provider": self.llm_provider,
+                                "model": self.llm_model,
+                                "agent": agent_label,
+                                "fallback": True,
+                            },
+                        )
+                        logger.warning(
+                            "orchestrator.google_model_fallback",
+                            requested_model=settings.google_model,
+                            fallback_model=model_name,
+                        )
+                        return response.content
+                    except Exception as fallback_error:
+                        logger.warning(
+                            "orchestrator.google_model_fallback_failed",
+                            requested_model=settings.google_model,
+                            fallback_model=model_name,
+                            error=str(fallback_error),
+                        )
+
+                if settings.openai_api_key:
+                    try:
+                        fallback_llm = _build_google_or_openai_fallback("openai")
+                        if fallback_llm:
+                            response = await fallback_llm.ainvoke(messages)
+                            self.llm = fallback_llm
+                            self.llm_provider = "openai"
+                            self.llm_model = settings.openai_model
+                            usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", None)
+                            self._record_tokens(state, usage)
+                            end_ai_generation(
+                                trace,
+                                name=f"orchestrator.{agent_label.lower()}",
+                                model=self.llm_model,
+                                input=[message.content for message in messages],
+                                output=response.content,
+                                usage=usage,
+                                metadata={
+                                    "provider": self.llm_provider,
+                                    "model": self.llm_model,
+                                    "agent": agent_label,
+                                    "fallback": True,
+                                },
+                            )
+                            logger.warning(
+                                "orchestrator.openai_fallback",
+                                requested_model=settings.google_model,
+                                fallback_model=settings.openai_model,
+                            )
+                            return response.content
+                    except Exception as fallback_error:
+                        logger.warning(
+                            "orchestrator.openai_fallback_failed",
+                            requested_model=settings.google_model,
+                            fallback_model=settings.openai_model,
+                            error=str(fallback_error),
+                        )
+
             logger.error("orchestrator.llm_error", error=str(e))
+            end_ai_generation(
+                trace,
+                name=f"orchestrator.{agent_label.lower()}",
+                model=self.llm_model or settings.openai_model or settings.google_model,
+                input=[message.content for message in messages],
+                output=None,
+                metadata={
+                    "provider": self.llm_provider,
+                    "model": self.llm_model,
+                    "agent": agent_label,
+                },
+                level="ERROR",
+                status_message=str(e),
+            )
             return f"Sorry, I ran into an error: {str(e)}"
 
     # ─── Task Agent ────────────────────────────────────────────────────────────
@@ -185,7 +510,7 @@ class FamilyOpsOrchestrator:
                     context_text += f", due: {t['due_date']}"
                 context_text += "\n"
 
-        reply = await self._call_llm(message, context_text, "Task")
+        reply = await self._call_llm(message, context_text, "Task", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -208,7 +533,7 @@ class FamilyOpsOrchestrator:
                     context_text += f" at {e['location']}"
                 context_text += "\n"
 
-        reply = await self._call_llm(message, context_text, "Calendar")
+        reply = await self._call_llm(message, context_text, "Calendar", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -220,6 +545,18 @@ class FamilyOpsOrchestrator:
         state["tools_called"].append("grocery_agent")
         message = state["messages"][-1].content
         db_context = state["context"].get("db_context", {})
+        db = state["context"].get("db")
+
+        if _is_create_request(message, ["grocery", "shopping list", "groceries", "shop"]):
+            if db is None:
+                state["reply"] = "I can create the grocery list, but the database session was not available."
+            else:
+                created = await create_grocery_list_from_message(db, message, db_context)
+                state["reply"] = created["reply"]
+                state["context"]["resource"] = created["resource"]
+            state["status"] = "completed"
+            await self._finish(state)
+            return state
 
         lists = db_context.get("grocery_lists", [])
         context_text = ""
@@ -233,7 +570,7 @@ class FamilyOpsOrchestrator:
                     context_text += f" ({', '.join(i['name'] for i in unchecked[:5])})"
                 context_text += "\n"
 
-        reply = await self._call_llm(message, context_text, "Grocery")
+        reply = await self._call_llm(message, context_text, "Grocery", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -245,6 +582,18 @@ class FamilyOpsOrchestrator:
         state["tools_called"].append("meal_agent")
         message = state["messages"][-1].content
         db_context = state["context"].get("db_context", {})
+        db = state["context"].get("db")
+
+        if _is_create_request(message, ["meal", "meals", "meal plan", "plan"]):
+            if db is None:
+                state["reply"] = "I can create the meal plan, but the database session was not available."
+            else:
+                created = await create_meal_plan_from_message(db, message, db_context)
+                state["reply"] = created["reply"]
+                state["context"]["resource"] = created["resource"]
+            state["status"] = "completed"
+            await self._finish(state)
+            return state
 
         plans = db_context.get("meal_plans", [])
         members = db_context.get("family_members", [])
@@ -263,7 +612,7 @@ class FamilyOpsOrchestrator:
                 if isinstance(meals, dict):
                     context_text += f"- {day.capitalize()}: {meals.get('breakfast', '?')} / {meals.get('lunch', '?')} / {meals.get('dinner', '?')}\n"
 
-        reply = await self._call_llm(message, context_text, "Meal")
+        reply = await self._call_llm(message, context_text, "Meal", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -287,7 +636,7 @@ class FamilyOpsOrchestrator:
                     context_text += f" ({r['recurrence']})"
                 context_text += "\n"
 
-        reply = await self._call_llm(message, context_text, "Reminder")
+        reply = await self._call_llm(message, context_text, "Reminder", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -305,9 +654,10 @@ class FamilyOpsOrchestrator:
         if memories:
             context_text = f"Relevant household memories ({len(memories)}):\n"
             for m in memories[:8]:
-                context_text += f"- [{m.get('category', 'general')}] {m['content']}\n"
+                memory_type = m.get("memory_type") or m.get("category") or "general"
+                context_text += f"- [{memory_type}] {m['content']}\n"
 
-        reply = await self._call_llm(message, context_text, "Memory")
+        reply = await self._call_llm(message, context_text, "Memory", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -322,7 +672,7 @@ class FamilyOpsOrchestrator:
         bill_context = state["context"].get("bill_context", {})
         context_text = f"Bill: {bill_context.get('description')} | Amount:                             {bill_context.get('amount')} | Due: {bill_context.get('due_date')}"
         
-        reply = await self._call_llm(message, context_text, "Payment")
+        reply = await self._call_llm(message, context_text, "Payment", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -334,7 +684,7 @@ class FamilyOpsOrchestrator:
         state["tools_called"].append("email_agent")
         message = state["messages"][-1].content
         context_text = "Email ingestion is available. Configure IMAP credentials in Settings to enable automatic email processing and action-item extraction."
-        reply = await self._call_llm(message, context_text, "Email")
+        reply = await self._call_llm(message, context_text, "Email", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -346,7 +696,7 @@ class FamilyOpsOrchestrator:
         state["tools_called"].append("shopping_agent")
         message = state["messages"][-1].content
         context_text = "Shopping assistance available: search products, compare prices, get recommendations, find alternatives, track prices, and view favorites."
-        reply = await self._call_llm(message, context_text, "Shopping")
+        reply = await self._call_llm(message, context_text, "Shopping", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -372,7 +722,7 @@ class FamilyOpsOrchestrator:
             parts.append(f"{len(db_context['family_members'])} family members")
 
         context_text = f"Household snapshot: {', '.join(parts)}." if parts else ""
-        reply = await self._call_llm(message, context_text, "General")
+        reply = await self._call_llm(message, context_text, "General", state)
         state["reply"] = reply
         state["status"] = "completed"
         await self._finish(state)
@@ -403,12 +753,18 @@ class FamilyOpsOrchestrator:
 
         try:
             result = await self.graph.ainvoke(initial_state)
+            public_context = {
+                key: value
+                for key, value in (result.get("context") or {}).items()
+                if key != "db"
+            }
             return {
                 "workflow_id": workflow_id,
                 "status": result["status"],
                 "reply": result.get("reply", ""),
-                "context": result["context"],
+                "context": public_context,
                 "tools_called": result["tools_called"],
+                "tokens_used": int(public_context.get("tokens_used") or 0),
             }
         except Exception as e:
             logger.error("orchestrator.run_error", error=str(e))

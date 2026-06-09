@@ -1,9 +1,35 @@
 import axios from "axios";
 
+const getApiToken = () => {
+  const envToken = process.env.NEXT_PUBLIC_API_BEARER_TOKEN;
+
+  if (typeof window === "undefined") {
+    return envToken;
+  }
+
+  return window.localStorage.getItem("familyops_api_token") || envToken;
+};
+
 const api = axios.create({
   baseURL: "/api/v1",
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
+});
+
+api.interceptors.request.use((config) => {
+  const token = getApiToken();
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    config.headers = config.headers ?? {};
+    delete (config.headers as Record<string, string>)["Content-Type"];
+    delete (config.headers as Record<string, string>)["content-type"];
+  }
+
+  return config;
 });
 
 api.interceptors.response.use(
@@ -73,6 +99,19 @@ export const memoryApi = {
   search: (data: unknown) => api.post("/memory/search", data),
   delete: (id: string) => api.delete(`/memory/${id}`),
   categories: () => api.get("/memory/categories/summary"),
+};
+
+export const uploadsApi = {
+  uploadDocument: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/uploads/document", formData);
+  },
+  uploadFoodImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/uploads/food-image", formData);
+  },
 };
 
 export const familyApi = {

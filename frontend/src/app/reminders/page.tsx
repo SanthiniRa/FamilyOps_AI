@@ -59,7 +59,7 @@ export default function RemindersPage() {
         <Card className="border-yellow-200 bg-yellow-50">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base text-yellow-800">
-              <Bell className="h-4 w-4" /> Today's Reminders ({todayReminders.length})
+              <Bell className="h-4 w-4" /> Today&apos;s Reminders ({todayReminders.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -69,7 +69,8 @@ export default function RemindersPage() {
                   <div>
                     <p className="text-sm font-medium">{r.title}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />{formatRelative(r.remind_at)}
+                      <Clock className="h-3 w-3" />
+                      {formatRelative(r.remind_at)}
                     </p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => dismiss.mutate(r.id)}>Dismiss</Button>

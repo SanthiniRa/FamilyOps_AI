@@ -40,6 +40,7 @@ class KnowledgeAgent:
         memory_type: Optional[str] = None,
         limit: int = 5,
         threshold: float = 0.5,
+        metadata_filter: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Search household memory using semantic search.
@@ -67,6 +68,7 @@ class KnowledgeAgent:
             results = await memory_service.search_memory(
                 query=query,
                 memory_type=memory_type,
+                metadata_filter=metadata_filter,
                 k=limit,
             )
             
@@ -161,6 +163,7 @@ class KnowledgeAgent:
         query: str,
         context_type: Optional[str] = None,
         detail_level: str = "medium",
+        metadata_filter: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Build rich context for LLM from knowledge base.
@@ -181,7 +184,11 @@ class KnowledgeAgent:
             # Build context based on detail level
             k = {"brief": 3, "medium": 5, "detailed": 10}.get(detail_level, 5)
             
-            context = await rag_service.build_context(query)
+            context = await rag_service.build_context(
+                query,
+                metadata_filter=metadata_filter,
+                k=k,
+            )
             
             logger.info("knowledge.context_built", context_len=len(context) if context else 0)
             

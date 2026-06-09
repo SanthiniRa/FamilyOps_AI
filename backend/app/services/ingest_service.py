@@ -4,9 +4,11 @@ from datetime import datetime
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.models import UploadedDocument
 from app.services.rag_service import rag_service
+from app.services.rag_retrieval import split_semantic_chunks
 from app.core.logging import logger
 
 try:
@@ -227,18 +229,9 @@ def _build_chunk_metadata(document: UploadedDocument, page: int, chunk_index: in
 
 
 def _chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
-    words = text.split()
-    if not words:
-        return []
-
-    if chunk_size <= overlap:
-        chunk_size = overlap + 1
-
-    chunks: List[str] = []
-    index = 0
-    while index < len(words):
-        part = words[index:index + chunk_size]
-        chunks.append(" ".join(part))
-        index += chunk_size - overlap
-
-    return chunks
+    # Preserve semantic boundaries first, then fall back to bounded word chunks.
+    return split_semantic_chunks(
+        text,
+        max_words=min(chunk_size, settings.rag_document_chunk_words),
+        overlap=min(overlap, settings.rag_document_chunk_overlap),
+    )

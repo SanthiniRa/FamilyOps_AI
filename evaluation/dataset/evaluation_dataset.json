@@ -1,0 +1,612 @@
+{
+  "dataset_name": "familyops_synthetic_eval_v1",
+  "meta": {
+    "description": "Synthetic regression dataset for routing, tool selection, RAG quality, answer quality, and hallucination checks.",
+    "generated_at": "2026-06-09",
+    "cases_per_domain": 10,
+    "total_cases": 40
+  },
+  "cases": [
+    {
+      "id": "email_calendar_01",
+      "category": "email_calendar",
+      "input_query": "From Lisa's email, add the dentist appointment on Friday June 12 at 3:00 PM to my calendar.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Lisa emailed: dentist appointment on Friday June 12 at 3:00 PM.",
+        "Location: 124 Oak Street, Suite 3."
+      ],
+      "reference_answer": "I added the dentist appointment for Friday June 12 at 3:00 PM at 124 Oak Street, Suite 3 to the calendar.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "high"}
+    },
+    {
+      "id": "email_calendar_02",
+      "category": "email_calendar",
+      "input_query": "Please turn the PTA meeting in Jordan's email into a calendar event for Tuesday at 6 PM.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Jordan wrote that the PTA meeting is Tuesday June 16 at 6:00 PM.",
+        "The meeting will be in the school library."
+      ],
+      "reference_answer": "I scheduled the PTA meeting for Tuesday June 16 at 6:00 PM in the school library.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "medium"}
+    },
+    {
+      "id": "email_calendar_03",
+      "category": "email_calendar",
+      "input_query": "Add the soccer carpool reminder from the email to my calendar on Wednesday morning.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Email says soccer carpool starts Wednesday June 17 at 7:30 AM.",
+        "Pickup is at the west entrance."
+      ],
+      "reference_answer": "I added the soccer carpool reminder for Wednesday June 17 at 7:30 AM at the west entrance.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "medium"}
+    },
+    {
+      "id": "email_calendar_04",
+      "category": "email_calendar",
+      "input_query": "From the school email, create a calendar event for the field trip on June 18 at 8 AM.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "School email confirms the field trip on Thursday June 18 at 8:00 AM.",
+        "Students should meet at the front gate."
+      ],
+      "reference_answer": "I created a calendar event for the field trip on Thursday June 18 at 8:00 AM at the front gate.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "high"}
+    },
+    {
+      "id": "email_calendar_05",
+      "category": "email_calendar",
+      "input_query": "Calendar the vet appointment mentioned in the email for next Monday at 2 PM.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Vet appointment is Monday June 15 at 2:00 PM.",
+        "Clinic address: 88 Pine Avenue."
+      ],
+      "reference_answer": "I added the vet appointment for Monday June 15 at 2:00 PM at 88 Pine Avenue.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "high"}
+    },
+    {
+      "id": "email_calendar_06",
+      "category": "email_calendar",
+      "input_query": "Please put the parent-teacher conference from the email on my calendar for Thursday evening.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Parent-teacher conference is Thursday June 18 at 7:00 PM.",
+        "Conference room B is reserved."
+      ],
+      "reference_answer": "I created a calendar event for the parent-teacher conference on Thursday June 18 at 7:00 PM in Conference Room B.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "medium"}
+    },
+    {
+      "id": "email_calendar_07",
+      "category": "email_calendar",
+      "input_query": "From the billing email, add the due date to my calendar for next Friday.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Invoice is due Friday June 19.",
+        "Payment reminder should be set for the morning."
+      ],
+      "reference_answer": "I added the due date to the calendar for Friday June 19 in the morning.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "medium"}
+    },
+    {
+      "id": "email_calendar_08",
+      "category": "email_calendar",
+      "input_query": "Add the piano recital from the email to the calendar for Saturday at 4 PM.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Piano recital is Saturday June 20 at 4:00 PM.",
+        "Venue: downtown arts center."
+      ],
+      "reference_answer": "I added the piano recital for Saturday June 20 at 4:00 PM at the downtown arts center.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "low"}
+    },
+    {
+      "id": "email_calendar_09",
+      "category": "email_calendar",
+      "input_query": "Please schedule the orthodontist visit from the email for Tuesday at 11 AM.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Orthodontist visit is Tuesday June 16 at 11:00 AM.",
+        "Office is on Maple Road."
+      ],
+      "reference_answer": "I scheduled the orthodontist visit for Tuesday June 16 at 11:00 AM on Maple Road.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "high"}
+    },
+    {
+      "id": "email_calendar_10",
+      "category": "email_calendar",
+      "input_query": "Convert the birthday dinner email into a calendar event for next Saturday night.",
+      "expected_intent_label": "calendar",
+      "expected_tool": "calendar_tool",
+      "expected_agent": "calendar_agent",
+      "expected_retrieved_context": [
+        "Birthday dinner is Saturday June 20 at 7:30 PM.",
+        "Restaurant reservation is under the family name."
+      ],
+      "reference_answer": "I added the birthday dinner for Saturday June 20 at 7:30 PM with the family reservation note.",
+      "expected_routing_path": ["router", "calendar_agent"],
+      "metadata": {"source": "email", "priority": "medium"}
+    },
+    {
+      "id": "meal_planning_01",
+      "category": "meal_planning",
+      "input_query": "Plan dinners this week for a lactose-free family using the chicken and broccoli we already have.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Family preference: lactose-free dinners.",
+        "Pantry items available: chicken breast, broccoli, rice."
+      ],
+      "reference_answer": "I created a dinner plan that uses chicken breast and broccoli and keeps the meals lactose-free.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "moderate"}
+    },
+    {
+      "id": "meal_planning_02",
+      "category": "meal_planning",
+      "input_query": "Give me five kid-friendly dinners that avoid peanuts and fit a busy week.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Family preference: peanut-free meals.",
+        "Weeknight dinners should take under 30 minutes."
+      ],
+      "reference_answer": "I put together five kid-friendly peanut-free dinners that are quick enough for busy weeknights.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "moderate"}
+    },
+    {
+      "id": "meal_planning_03",
+      "category": "meal_planning",
+      "input_query": "Build a vegetarian meal plan and use the sweet potatoes and spinach in the pantry.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Vegetarian household preference is enabled for Mondays and Wednesdays.",
+        "Pantry items available: sweet potatoes, spinach, onions."
+      ],
+      "reference_answer": "I built a vegetarian meal plan that uses sweet potatoes and spinach from the pantry.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "low"}
+    },
+    {
+      "id": "meal_planning_04",
+      "category": "meal_planning",
+      "input_query": "Suggest gluten-free lunches for the next four days with a shopping list.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Family dietary restriction: gluten-free.",
+        "Need lunches for Monday through Thursday."
+      ],
+      "reference_answer": "I suggested gluten-free lunches for four days and included a matching shopping list.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "moderate"}
+    },
+    {
+      "id": "meal_planning_05",
+      "category": "meal_planning",
+      "input_query": "Create a high-protein dinner plan for training week and keep it under $120.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "High protein meals are preferred during training week.",
+        "Budget cap for meals is $120."
+      ],
+      "reference_answer": "I created a high-protein dinner plan that stays under the $120 budget.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "120"}
+    },
+    {
+      "id": "meal_planning_06",
+      "category": "meal_planning",
+      "input_query": "What can we make for dinner with ground turkey, carrots, and pasta this week?",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Pantry items available: ground turkey, carrots, pasta.",
+        "Simple family dinners are preferred on Tuesdays."
+      ],
+      "reference_answer": "I suggested dinner ideas that use ground turkey, carrots, and pasta for this week.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "low"}
+    },
+    {
+      "id": "meal_planning_07",
+      "category": "meal_planning",
+      "input_query": "Plan three quick dinners with one fish recipe and keep the kids happy.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Family likes mild flavors for weeknight dinners.",
+        "One dinner should include fish once per week."
+      ],
+      "reference_answer": "I planned three quick kid-friendly dinners and included one mild fish recipe.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "moderate"}
+    },
+    {
+      "id": "meal_planning_08",
+      "category": "meal_planning",
+      "input_query": "Can you make a meal plan around the roasted vegetables and leftover chicken in the fridge?",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Fridge inventory includes leftover chicken and roasted vegetables.",
+        "Dinner plans should reuse leftovers when possible."
+      ],
+      "reference_answer": "I made a meal plan that reuses the leftover chicken and roasted vegetables.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "low"}
+    },
+    {
+      "id": "meal_planning_09",
+      "category": "meal_planning",
+      "input_query": "Create meals for the week that are dairy-free and keep prep under 20 minutes.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "Family diet is dairy-free.",
+        "Prep time should stay under 20 minutes on weeknights."
+      ],
+      "reference_answer": "I created a dairy-free weeknight meal plan with prep times under 20 minutes.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "moderate"}
+    },
+    {
+      "id": "meal_planning_10",
+      "category": "meal_planning",
+      "input_query": "Help me build a balanced meal plan for two adults and two kids using pantry staples.",
+      "expected_intent_label": "meal",
+      "expected_tool": "meal_planner_tool",
+      "expected_agent": "meal_agent",
+      "expected_retrieved_context": [
+        "The household has two adults and two kids.",
+        "Pantry staples include rice, beans, oats, and canned tomatoes."
+      ],
+      "reference_answer": "I built a balanced family meal plan that leans on pantry staples like rice, beans, oats, and canned tomatoes.",
+      "expected_routing_path": ["router", "meal_agent"],
+      "metadata": {"source": "meal_planning", "budget": "moderate"}
+    },
+    {
+      "id": "memory_lookup_01",
+      "category": "memory_lookup",
+      "input_query": "What pizza place did we decide the kids liked best?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Family memory: the kids liked Mario's Pizza best for Friday dinners.",
+        "Notes mention cheese pizza and garlic knots."
+      ],
+      "reference_answer": "We decided the kids liked Mario's Pizza best.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "food"}
+    },
+    {
+      "id": "memory_lookup_02",
+      "category": "memory_lookup",
+      "input_query": "Which allergy note did we save for Maya?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Memory says Maya is allergic to strawberries and peanuts.",
+        "Keep dessert labels clear for school events."
+      ],
+      "reference_answer": "We saved that Maya is allergic to strawberries and peanuts.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "health"}
+    },
+    {
+      "id": "memory_lookup_03",
+      "category": "memory_lookup",
+      "input_query": "Do you remember which babysitter we planned to contact for date night?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Household memory: contact Ava Chen for babysitting on weekends.",
+        "Ava is available after 6 PM."
+      ],
+      "reference_answer": "We planned to contact Ava Chen for babysitting on weekends.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "family"}
+    },
+    {
+      "id": "memory_lookup_04",
+      "category": "memory_lookup",
+      "input_query": "What did we say about the spare keys and where they are kept?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Spare keys are in the blue bowl by the front door.",
+        "Do not move them without telling Sam."
+      ],
+      "reference_answer": "The spare keys are in the blue bowl by the front door.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "household"}
+    },
+    {
+      "id": "memory_lookup_05",
+      "category": "memory_lookup",
+      "input_query": "Which dentist office did we prefer after the last visit?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Preferred dentist office is Bright Smiles Dental.",
+        "They accept the family insurance plan."
+      ],
+      "reference_answer": "We preferred Bright Smiles Dental after the last visit.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "health"}
+    },
+    {
+      "id": "memory_lookup_06",
+      "category": "memory_lookup",
+      "input_query": "What memory did we save about the after-school activity for this fall?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "The kids voted for soccer practice this fall.",
+        "Practice is on Tuesdays and Thursdays."
+      ],
+      "reference_answer": "The kids voted for soccer practice this fall.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "activities"}
+    },
+    {
+      "id": "memory_lookup_07",
+      "category": "memory_lookup",
+      "input_query": "What did we store about Grandma's birthday gift idea?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Grandma's birthday gift idea was a framed family photo.",
+        "Order by the end of June."
+      ],
+      "reference_answer": "We stored a framed family photo as Grandma's birthday gift idea.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "gift"}
+    },
+    {
+      "id": "memory_lookup_08",
+      "category": "memory_lookup",
+      "input_query": "Tell me the last note we saved about school pickup.",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "School pickup note: Ben should be collected by 3:15 PM.",
+        "Use the back gate when it rains."
+      ],
+      "reference_answer": "Ben should be collected by 3:15 PM using the back gate when it rains.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "school"}
+    },
+    {
+      "id": "memory_lookup_09",
+      "category": "memory_lookup",
+      "input_query": "What was our saved preference for Saturday breakfast?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Saturday breakfast preference is blueberry pancakes.",
+        "Serve with maple syrup and fruit."
+      ],
+      "reference_answer": "Our saved Saturday breakfast preference is blueberry pancakes.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "meal"}
+    },
+    {
+      "id": "memory_lookup_10",
+      "category": "memory_lookup",
+      "input_query": "What memory did we save about the holiday travel airport?",
+      "expected_intent_label": "memory",
+      "expected_tool": "memory_tool",
+      "expected_agent": "memory_agent",
+      "expected_retrieved_context": [
+        "Holiday travel airport choice is Sacramento International.",
+        "Arrive two hours early for family flights."
+      ],
+      "reference_answer": "We picked Sacramento International as the holiday travel airport.",
+      "expected_routing_path": ["router", "memory_agent"],
+      "metadata": {"source": "memory", "topic": "travel"}
+    },
+    {
+      "id": "general_chat_01",
+      "category": "general_chat",
+      "input_query": "How many open items and upcoming plans do we have right now?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "Household snapshot: 4 unfinished tasks.",
+        "Upcoming events: 2 calendar entries this week."
+      ],
+      "reference_answer": "You currently have 4 unfinished tasks and 2 upcoming events.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_02",
+      "category": "general_chat",
+      "input_query": "What should I focus on first this evening?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "High priority task: submit school form.",
+        "Dinner prep is already partially done."
+      ],
+      "reference_answer": "Focus on the high priority school form first, then finish dinner prep.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_03",
+      "category": "general_chat",
+      "input_query": "Can you summarize the household status for me?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "There are 3 pending reminders.",
+        "The pantry is low on milk and eggs.",
+        "One task is overdue."
+      ],
+      "reference_answer": "The household has 3 pending reminders, low milk and eggs, and 1 overdue task.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_04",
+      "category": "general_chat",
+      "input_query": "What is the best next step before we leave the house?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "Reminder: lock the back door before leaving.",
+        "Pack water bottles for the kids."
+      ],
+      "reference_answer": "Lock the back door and pack water bottles before leaving.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_05",
+      "category": "general_chat",
+      "input_query": "What's the current family plan for tonight?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "Tonight's plan: soccer practice at 5:30 PM.",
+        "Dinner is leftover pasta after practice."
+      ],
+      "reference_answer": "Tonight the plan is soccer practice at 5:30 PM and leftover pasta afterward.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_06",
+      "category": "general_chat",
+      "input_query": "Do we have anything important coming up this weekend?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "Weekend event: piano recital on Saturday at 4 PM.",
+        "Sunday brunch with the grandparents at 11 AM."
+      ],
+      "reference_answer": "Yes, the piano recital is Saturday at 4 PM and brunch with the grandparents is Sunday at 11 AM.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_07",
+      "category": "general_chat",
+      "input_query": "What items are low in the pantry and need attention soon?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "Low stock items: milk, eggs, bananas.",
+        "Grocery list is active for the weekend."
+      ],
+      "reference_answer": "You should restock milk, eggs, and bananas soon.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_08",
+      "category": "general_chat",
+      "input_query": "Can you tell me the main family priorities today?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "Priority 1: send the school email reply.",
+        "Priority 2: prepare lunch boxes."
+      ],
+      "reference_answer": "The main priorities today are to send the school email reply and prepare lunch boxes.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_09",
+      "category": "general_chat",
+      "input_query": "What did we decide if practice runs late?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "If soccer runs late, dinner becomes sandwiches and fruit.",
+        "Keep it simple on practice nights."
+      ],
+      "reference_answer": "If practice runs late, the fallback plan is sandwiches and fruit.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    },
+    {
+      "id": "general_chat_10",
+      "category": "general_chat",
+      "input_query": "What does the family dashboard look like today?",
+      "expected_intent_label": "general",
+      "expected_tool": "chat",
+      "expected_agent": "general_agent",
+      "expected_retrieved_context": [
+        "Dashboard summary: 1 overdue task, 2 upcoming meetings, 3 pending reminders.",
+        "Pantry needs restocking for breakfast items."
+      ],
+      "reference_answer": "Today the dashboard shows 1 overdue task, 2 upcoming meetings, 3 pending reminders, and a breakfast restock.",
+      "expected_routing_path": ["router", "general_agent"],
+      "metadata": {"source": "household_snapshot"}
+    }
+  ]
+}

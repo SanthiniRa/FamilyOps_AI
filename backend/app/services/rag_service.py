@@ -1,11 +1,23 @@
 from typing import List, Dict, Any, Optional
-from langchain_community.vectorstores import SupabaseVectorStore
-from langchain_core.documents import Document
+
 from app.core.config import settings
 from app.core.logging import logger
+from app.observability.metrics import TOOL_COUNTER
+from app.services.rag_retrieval import (
+    build_context_from_candidates,
+    chunk_memory_content,
+    coerce_text_content,
+)
 
 
 def build_embeddings():
+    if settings.openai_api_key:
+        from langchain_openai import OpenAIEmbeddings
+        return OpenAIEmbeddings(
+            model=settings.openai_embedding_model,
+            api_key=settings.openai_api_key,
+        )
+
     if settings.google_api_key:
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
         return GoogleGenerativeAIEmbeddings(
@@ -15,121 +27,137 @@ def build_embeddings():
 
     from langchain_openai import OpenAIEmbeddings
     return OpenAIEmbeddings(
-        model="text-embedding-3-small",
+        model=settings.openai_embedding_model,
         api_key=settings.openai_api_key,
     )
 
 
+def _extract_citation(metadata: Optional[Dict[str, Any]]):
+    if not metadata:
+        return ""
+
+    citation_parts = []
+    filename = metadata.get("filename")
+    if filename:
+        citation_parts.append(filename)
+
+    page = metadata.get("page")
+    if page is not None:
+        citation_parts.append(f"page {page}")
+
+    chunk_index = metadata.get("chunk_index")
+    if chunk_index is not None:
+        citation_parts.append(f"chunk {chunk_index}")
+
+    document_id = metadata.get("document_id")
+    if document_id:
+        citation_parts.append(f"doc:{document_id}")
+
+    return " | ".join(citation_parts)
+
+
 class RAGService:
-    def __init__(self):
-        self.embeddings = build_embeddings()
-        self.vector_store = None
+    def _extract_citation(self, metadata: Optional[Dict[str, Any]]):
+        return _extract_citation(metadata)
 
     async def init(self):
-        from supabase import create_client
+        # Canonical storage is the Memory table. The underlying memory service
+        # can still initialize its optional vector index lazily.
+        from app.memory.memory import memory_service
 
-        client = create_client(
-            settings.supabase_url,
-            settings.supabase_service_key
-        )
-
-        self.vector_store = SupabaseVectorStore(
-            client=client,
-            embedding=self.embeddings,
-            table_name="household_memories",
-            query_name="match_memories",
-        )
-
+        await memory_service.init()
         logger.info("rag.initialized")
 
-    # ======================================================
-    # STORE MEMORY (WITH TYPE TAGGING)
-    # ======================================================
     async def store_memory(
         self,
-        content: str,
+        content: Any,
         memory_type: str = "general",
         metadata: Optional[Dict[str, Any]] = None
     ):
+        from app.memory.memory import memory_service
+
         metadata = metadata or {}
         metadata["type"] = memory_type
 
-        doc = Document(
-            page_content=content,
-            metadata=metadata
-        )
+        TOOL_COUNTER.labels(tool="rag_store").inc()
+        chunks = chunk_memory_content(content, memory_type=memory_type, metadata=metadata)
+        if not chunks:
+            chunks = chunk_memory_content(coerce_text_content(content), memory_type=memory_type, metadata=metadata)
 
-        ids = await self.vector_store.aadd_documents([doc])
-        return ids[0] if ids else None
+        primary_id = None
+        stored_ids = []
+        for chunk in chunks or []:
+            memory = await memory_service.create_memory(
+                content=chunk.content,
+                memory_type=memory_type,
+                metadata=chunk.metadata,
+            )
+            if memory and primary_id is None:
+                primary_id = memory.id
+            if memory:
+                stored_ids.append(memory.id)
 
-    def _extract_citation(self, metadata: Optional[Dict[str, Any]]):
-        if not metadata:
-            return ""
+        if primary_id is None:
+            memory = await memory_service.create_memory(
+                content=coerce_text_content(content),
+                memory_type=memory_type,
+                metadata=metadata,
+            )
+            primary_id = memory.id if memory else None
+            if memory:
+                stored_ids.append(memory.id)
 
-        citation_parts = []
-        filename = metadata.get("filename")
-        if filename:
-            citation_parts.append(filename)
+        if stored_ids and len(stored_ids) > 1:
+            logger.info("rag.memory.chunked", memory_type=memory_type, chunks=len(stored_ids))
 
-        page = metadata.get("page")
-        if page is not None:
-            citation_parts.append(f"page {page}")
+        return primary_id
 
-        chunk_index = metadata.get("chunk_index")
-        if chunk_index is not None:
-            citation_parts.append(f"chunk {chunk_index}")
-
-        document_id = metadata.get("document_id")
-        if document_id:
-            citation_parts.append(f"doc:{document_id}")
-
-        return " | ".join(citation_parts)
-
-    # ======================================================
-    # HYBRID SEARCH (IMPORTANT IMPROVEMENT)
-    # ======================================================
     async def search(
         self,
         query: str,
         memory_type: Optional[str] = None,
+        metadata_filter: Optional[Dict[str, Any]] = None,
         k: int = 5
     ):
-        if not self.vector_store:
-            return []
+        from app.memory.memory import memory_service
 
-        filter_dict = {}
-        if memory_type:
-            filter_dict = {"type": memory_type}
-
-        results = await self.vector_store.asimilarity_search_with_relevance_scores(
-            query,
+        TOOL_COUNTER.labels(tool="rag_search").inc()
+        results = await memory_service.search_memory(
+            query=query,
+            memory_type=memory_type,
+            metadata_filter=metadata_filter,
             k=k,
-            filter=filter_dict if filter_dict else None
         )
 
         return [
             {
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-                "score": score,
-                "citation": self._extract_citation(doc.metadata),
+                "content": item.get("content"),
+                "metadata": item.get("metadata", {}),
+                "score": item.get("score", 0.0),
+                "citation": self._extract_citation(item.get("metadata", {})),
             }
-            for doc, score in results
+            for item in results
         ]
 
-    # ======================================================
-    # CONTEXT BUILDER (VERY IMPORTANT FOR LLM QUALITY)
-    # ======================================================
-    async def build_context(self, query: str):
-        memories = await self.search(query, k=5)
+    async def build_context(
+        self,
+        query: str,
+        memory_type: Optional[str] = None,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+        k: int = 5,
+        token_budget: int = settings.rag_context_token_budget,
+    ):
+        memories = await self.search(
+            query,
+            memory_type=memory_type,
+            metadata_filter=metadata_filter,
+            k=max(k * 3, 9),
+        )
 
         if not memories:
             return ""
 
-        context = "\n\n".join(
-            f"[score={m['score']:.2f} | citation={m['citation']} | type={m['metadata'].get('type')}\n{m['content']}"
-            for m in memories
-        )
+        context = build_context_from_candidates(memories, token_budget=token_budget, max_items=k)
 
         return context
 

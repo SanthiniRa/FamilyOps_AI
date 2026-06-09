@@ -62,12 +62,12 @@ export default function SettingsPage() {
           />
           <IntegrationCard
             icon={<Bot className="h-5 w-5 text-indigo-500" />}
-            title="OpenAI API"
-            description="Powers all AI agents, embeddings, and LangGraph orchestration."
+            title="OpenAI API (Primary)"
+            description="Powers all AI agents, embeddings, and LangGraph orchestration from your OPENAI_API_KEY and OPENAI_MODEL."
             status="configure"
             fields={[
               { label: "API Key", placeholder: "sk-...", env: "OPENAI_API_KEY" },
-              { label: "Model", placeholder: "gpt-4o", env: "OPENAI_MODEL" },
+              { label: "Model", placeholder: "gpt-5.4-mini", env: "OPENAI_MODEL" },
               { label: "Embedding Model", placeholder: "text-embedding-3-small", env: "OPENAI_EMBEDDING_MODEL" },
             ]}
           />

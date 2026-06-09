@@ -27,6 +27,7 @@ opentelemetry-sdk==1.24.0
 opentelemetry-exporter-otlp==1.24.0
 prometheus-client==0.20.0
 ragas==0.1.10
+deepeval>=0.21.0
 email-validator==2.1.1
 icalendar==5.0.12
 google-api-python-client==2.131.0
@@ -39,4 +40,11 @@ Pillow==10.0.0
 langchain-google-genai
 aiosqlite
 aiofiles
-celery redis
+celery 
+redis
+langfuse>=2.44.0
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-logging
+opentelemetry-instrumentation-sqlalchemy
+opentelemetry-instrumentation-redis
+prometheus-fastapi-instrumentator

@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
@@ -6,14 +6,18 @@ import asyncio
 import traceback
 from app.workers.email_ingestor import ingest_emails
 from app.core.config import settings
+from app.core.auth import require_api_token
 from app.core.logging import setup_logging, logger
 from app.db.database import init_db, AsyncSessionLocal
 import os
 from app.events.bus import event_bus
 from app.workers.email_processor import process_emails
-
+from app.observability.middleware import RequestLoggingMiddleware
 from app.api.routes import briefing
 
+from app.observability.tracing import tracer
+
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.api.routes import (
     tasks,
     grocery,
@@ -40,16 +44,37 @@ async def lifespan(app: FastAPI):
     )
 
     # Initialize DB
-    await init_db()
+    try:
+        await init_db()
+    except Exception as e:
+        logger.exception(
+            "database.startup.failed",
+            error=str(e),
+        )
+        raise
 
     # Start event bus
     event_task = asyncio.create_task(event_bus.start())
+    from app.observability.langfuse_client import langfuse as langfuse_client
 
+    logger.info(
+        "observability.initialized"
+    )
+    if langfuse_client:
+        logger.info("observability.langfuse.enabled")
+    else:
+        logger.info("observability.langfuse.disabled")
     # Run email pipeline ONCE at startup (safe init)
     try:
         logger.info("email.startup.processing")
 
         async with AsyncSessionLocal() as db:
+            if settings.email_address and settings.email_password:
+                await ingest_emails(
+                    db,
+                    settings.email_address,
+                    settings.email_password,
+                )
             await process_emails(db)
 
         logger.info("email.startup.completed")
@@ -71,6 +96,13 @@ async def lifespan(app: FastAPI):
         pass
 
     event_bus.stop()
+
+    try:
+        from app.observability.langfuse_client import flush_langfuse
+
+        flush_langfuse()
+    except Exception as e:
+        logger.exception("observability.langfuse.shutdown_flush_failed", error=str(e))
 # ============================================================
 # FASTAPI APP
 # ============================================================
@@ -100,20 +132,30 @@ app.add_middleware(
     minimum_size=1000,
 )
 
+
 # ============================================================
 # ROUTES
 # ============================================================
-app.include_router(dashboard.router, prefix="/api/v1")
-app.include_router(tasks.router, prefix="/api/v1")
-app.include_router(grocery.router, prefix="/api/v1")
-app.include_router(meals.router, prefix="/api/v1")
-app.include_router(reminders.router, prefix="/api/v1")
-app.include_router(calendar.router, prefix="/api/v1")
-app.include_router(memory.router, prefix="/api/v1")
-app.include_router(family.router, prefix="/api/v1")
-app.include_router(agent.router, prefix="/api/v1")
-app.include_router(uploads.router, prefix="/api/v1")
-app.include_router(briefing.router)
+protected = [Depends(require_api_token)]
+
+app.include_router(dashboard.router, prefix="/api/v1", dependencies=protected)
+app.include_router(tasks.router, prefix="/api/v1", dependencies=protected)
+app.include_router(grocery.router, prefix="/api/v1", dependencies=protected)
+app.include_router(meals.router, prefix="/api/v1", dependencies=protected)
+app.include_router(reminders.router, prefix="/api/v1", dependencies=protected)
+app.include_router(calendar.router, prefix="/api/v1", dependencies=protected)
+app.include_router(memory.router, prefix="/api/v1", dependencies=protected)
+app.include_router(family.router, prefix="/api/v1", dependencies=protected)
+app.include_router(agent.router, prefix="/api/v1", dependencies=protected)
+app.include_router(uploads.router, prefix="/api/v1", dependencies=protected)
+app.include_router(briefing.router, dependencies=protected)
+
+Instrumentator().instrument(app).expose(app)
+
+app.add_middleware(
+    RequestLoggingMiddleware
+)
+
 # ============================================================
 # ROOT
 # ============================================================

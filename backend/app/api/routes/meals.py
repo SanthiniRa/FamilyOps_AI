@@ -96,13 +96,14 @@ async def list_meal_plans(db: AsyncSession = Depends(get_db)):
     return [
         {
             "id": p.id,
-            "week_start": p.week_start.isoformat(),
-            "week_end": p.week_end.isoformat(),
-            "meals": p.meals,
-            "shopping_list": getattr(p, "shopping_list", {}),
-            "nutritional_summary": p.nutritional_summary,
-            "estimated_cost": getattr(p, "estimated_cost", None),
-            "budget": getattr(p, "budget", None),
+            "week_start": p.week_start.isoformat() if p.week_start else None,
+            "week_end": p.week_end.isoformat() if p.week_end else None,
+            "meals": (p.result or {}).get("meals", p.meals or {}),
+            "shopping_list": (p.result or {}).get("shopping_list", []),
+            "nutritional_summary": p.nutritional_summary or (p.result or {}).get("nutrition_summary", {}),
+            "estimated_cost": (p.result or {}).get("estimated_cost"),
+            "budget": (p.result or {}).get("budget"),
+            "warnings": (p.result or {}).get("warnings", []),
             "created_at": p.created_at,
         }
         for p in plans
@@ -162,9 +163,10 @@ async def generate_meal_plan(
 
     # 3. SAFE OUTPUT NORMALIZATION (CRITICAL)
     meals = result.get("meals", {})
-    shopping_list = result.get("shopping_list", {})
+    shopping_list = result.get("shopping_list", [])
     nutrition = result.get("nutrition_summary", {})
     cost = result.get("estimated_cost", None)
+    warnings = result.get("warnings", [])
 
     # 4. DB SAVE (must match schema!)
     plan = MealPlan(
@@ -173,12 +175,17 @@ async def generate_meal_plan(
         meals=meals,
         nutritional_summary=nutrition,
         generated_by_ai=True,
-        preferences_used=prefs,
+        preferences_used={**prefs, **data.preferences},
 
-        # SAFE: only if fields exist in DB
-        shopping_list=shopping_list if hasattr(MealPlan, "shopping_list") else None,
-        estimated_cost=cost if hasattr(MealPlan, "estimated_cost") else None,
-        budget=data.budget if hasattr(MealPlan, "budget") else None,
+        result={
+            "meals": meals,
+            "shopping_list": shopping_list,
+            "nutrition_summary": nutrition,
+            "estimated_cost": cost,
+            "budget": data.budget,
+            "over_budget": result.get("over_budget", False),
+            "warnings": warnings,
+        }
     )
 
     db.add(plan)
@@ -197,12 +204,15 @@ async def generate_meal_plan(
 
     return {
         "id": plan.id,
-        "week_start": week_start,
-        "week_end": week_end,
+        "week_start": week_start.isoformat(),
+        "week_end": week_end.isoformat(),
         "meals": meals,
         "shopping_list": shopping_list,
         "nutritional_summary": nutrition,
         "estimated_cost": cost,
+        "budget": data.budget,
+        "over_budget": result.get("over_budget", False),
+        "warnings": warnings,
         "generated_by_ai": True
     }
 
@@ -224,10 +234,13 @@ async def get_meal_plan(plan_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "id": plan.id,
-        "week_start": plan.week_start,
-        "week_end": plan.week_end,
-        "meals": plan.meals,
-        "shopping_list": getattr(plan, "shopping_list", {}),
-        "nutritional_summary": plan.nutritional_summary,
+        "week_start": plan.week_start.isoformat() if plan.week_start else None,
+        "week_end": plan.week_end.isoformat() if plan.week_end else None,
+        "meals": (plan.result or {}).get("meals", plan.meals or {}),
+        "shopping_list": (plan.result or {}).get("shopping_list", []),
+        "nutritional_summary": plan.nutritional_summary or (plan.result or {}).get("nutrition_summary", {}),
+        "estimated_cost": (plan.result or {}).get("estimated_cost"),
+        "budget": (plan.result or {}).get("budget"),
+        "warnings": (plan.result or {}).get("warnings", []),
         "generated_by_ai": plan.generated_by_ai,
     }

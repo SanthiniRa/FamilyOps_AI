@@ -34,6 +34,7 @@ class CalendarEventUpdate(BaseModel):
 
 
 @router.get("/events", response_model=List[dict])
+@router.get("/events/", response_model=List[dict])
 async def list_events(
     start: Optional[datetime] = Query(None),
     end: Optional[datetime] = Query(None),
@@ -60,6 +61,7 @@ async def list_events(
 
 
 @router.post("/events", status_code=201)
+@router.post("/events/", status_code=201)
 async def create_event(event: CalendarEventCreate, db: AsyncSession = Depends(get_db)):
     db_event = CalendarEvent(**event.model_dump())
     db.add(db_event)
@@ -75,6 +77,7 @@ async def create_event(event: CalendarEventCreate, db: AsyncSession = Depends(ge
 
 
 @router.get("/events/{event_id}")
+@router.get("/events/{event_id}/")
 async def get_event(event_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CalendarEvent).where(CalendarEvent.id == event_id))
     event = result.scalar_one_or_none()
@@ -89,6 +92,7 @@ async def get_event(event_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/events/{event_id}")
+@router.patch("/events/{event_id}/")
 async def update_event(event_id: str, update: CalendarEventUpdate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CalendarEvent).where(CalendarEvent.id == event_id))
     event = result.scalar_one_or_none()
@@ -101,6 +105,7 @@ async def update_event(event_id: str, update: CalendarEventUpdate, db: AsyncSess
 
 
 @router.delete("/events/{event_id}", status_code=204)
+@router.delete("/events/{event_id}/", status_code=204)
 async def delete_event(event_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CalendarEvent).where(CalendarEvent.id == event_id))
     event = result.scalar_one_or_none()
@@ -110,6 +115,7 @@ async def delete_event(event_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/events/upcoming/week")
+@router.get("/events/upcoming/week/")
 async def upcoming_week(db: AsyncSession = Depends(get_db)):
     now = datetime.utcnow()
     week_end = now + timedelta(days=7)
@@ -123,4 +129,3 @@ async def upcoming_week(db: AsyncSession = Depends(get_db)):
          "end_time": e.end_time, "location": e.location}
         for e in events
     ]
-

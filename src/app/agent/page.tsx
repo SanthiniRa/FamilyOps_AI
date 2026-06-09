@@ -16,6 +16,7 @@ interface Message {
   status?: string;
   agentUsed?: string;
   durationMs?: number;
+  tokensUsed?: number;
   timestamp: Date;
 }
 
@@ -107,15 +108,19 @@ export default function AgentPage() {
         content:
           data.reply ||
           data.result?.reply ||
+          formatCreatedResource(data.result?.context?.resource) ||
           "Done! Check the relevant section for updates.",
         status: data.status,
         agentUsed: data.result?.tools_called?.[0],
         durationMs: data.duration_ms,
+        tokensUsed: data.tokens_used ?? data.result?.tokens_used,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, agentMsg]);
       qc.invalidateQueries({ queryKey: ["agent-runs"] });
       qc.invalidateQueries({ queryKey: ["agent-stats"] });
+      qc.invalidateQueries({ queryKey: ["grocery-lists"] });
+      qc.invalidateQueries({ queryKey: ["meal-plans"] });
     },
     onError: () => {
       setMessages((prev) => [
@@ -153,7 +158,7 @@ export default function AgentPage() {
 
       {/* Stats row */}
       {stats && (
-        <div className="grid grid-cols-4 gap-3 shrink-0">
+        <div className="grid grid-cols-2 gap-3 shrink-0 md:grid-cols-5">
           {[
             {
               label: "Total Runs",
@@ -176,6 +181,11 @@ export default function AgentPage() {
                 ? `${Math.round(stats.avg_duration_ms)}ms`
                 : "—",
               icon: <Clock className="h-4 w-4 text-yellow-500" />,
+            },
+            {
+              label: "Tokens Used",
+              value: stats.total_tokens ?? 0,
+              icon: <Sparkles className="h-4 w-4 text-indigo-500" />,
             },
           ].map((s) => (
             <Card key={s.label}>
@@ -258,6 +268,11 @@ export default function AgentPage() {
                         {msg.durationMs && (
                           <span className="text-xs text-muted-foreground">
                             {msg.durationMs}ms
+                          </span>
+                        )}
+                        {msg.tokensUsed !== undefined && (
+                          <span className="text-xs text-muted-foreground">
+                            {msg.tokensUsed} tokens
                           </span>
                         )}
                       </div>
@@ -365,7 +380,10 @@ export default function AgentPage() {
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{formatTimeAgo(r.started_at)}</span>
-                    {r.duration_ms && <span>{r.duration_ms}ms</span>}
+                    <div className="flex items-center gap-2">
+                      {r.duration_ms && <span>{r.duration_ms}ms</span>}
+                      <span>{r.tokens_used ?? 0} tokens</span>
+                    </div>
                   </div>
                 </div>
               ))
@@ -375,4 +393,15 @@ export default function AgentPage() {
       </div>
     </div>
   );
+}
+
+function formatCreatedResource(resource: any): string {
+  if (!resource?.type) return "";
+  if (resource.type === "grocery_list") {
+    return `Created grocery list "${resource.name}" with ${resource.item_count ?? 0} items.`;
+  }
+  if (resource.type === "meal_plan") {
+    return "Created a meal plan for the requested week.";
+  }
+  return "";
 }

@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { memoryApi } from "@/lib/api";
+import { memoryApi, uploadsApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Trash2, Brain, Tag } from "lucide-react";
+import { Search, Trash2, Brain, Tag, FileText, Upload, Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { formatTimeAgo, cn } from "@/lib/utils";
 
 const CATEGORIES = ["preference", "routine", "medical", "emergency", "password-hint", "contact", "note"];
@@ -24,11 +24,15 @@ export default function MemoryPage() {
   const qc = useQueryClient();
   const [filterCategory, setFilterCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [form, setForm] = useState({ content: "", category: "note", tags: "", importance: "0.5" });
+  const [form, setForm] = useState({ content: "", memory_type: "note", tags: "", importance: "0.5" });
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [foodImageFile, setFoodImageFile] = useState<File | null>(null);
+  const [documentUpload, setDocumentUpload] = useState<any | null>(null);
+  const [foodUpload, setFoodUpload] = useState<any | null>(null);
 
   const { data: memories = [], isLoading } = useQuery({
     queryKey: ["memories", filterCategory],
-    queryFn: () => memoryApi.list(filterCategory ? { category: filterCategory } : undefined).then((r) => r.data),
+    queryFn: () => memoryApi.list(filterCategory ? { memory_type: filterCategory } : undefined).then((r) => r.data),
   });
 
   const { data: categories } = useQuery({
@@ -38,12 +42,59 @@ export default function MemoryPage() {
 
   const store = useMutation({
     mutationFn: (data: any) => memoryApi.store(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["memories"] }); qc.invalidateQueries({ queryKey: ["memory-categories"] }); setForm({ content: "", category: "note", tags: "", importance: "0.5" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["memories"] }); qc.invalidateQueries({ queryKey: ["memory-categories"] }); setForm({ content: "", memory_type: "note", tags: "", importance: "0.5" }); },
   });
 
   const del = useMutation({
     mutationFn: (id: string) => memoryApi.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["memories"] }); qc.invalidateQueries({ queryKey: ["memory-categories"] }); },
+  });
+
+  const uploadDocument = useMutation({
+    mutationFn: () => {
+      if (!documentFile) {
+        throw new Error("Choose a document, bill, or recipe file first.");
+      }
+      return uploadsApi.uploadDocument(documentFile);
+    },
+    onSuccess: (response) => {
+      setDocumentUpload(response.data);
+      setDocumentFile(null);
+      qc.invalidateQueries({ queryKey: ["memories"] });
+      qc.invalidateQueries({ queryKey: ["memory-categories"] });
+    },
+  });
+
+  const uploadFoodImage = useMutation({
+    mutationFn: () => {
+      if (!foodImageFile) {
+        throw new Error("Choose a grocery or food photo first.");
+      }
+      return uploadsApi.uploadFoodImage(foodImageFile);
+    },
+    onSuccess: (response) => {
+      setFoodUpload(response.data);
+      setFoodImageFile(null);
+    },
+  });
+
+  const saveSuggestedRecipe = useMutation({
+    mutationFn: (suggestion: any) => memoryApi.store({
+      content: `Recipe suggestion from photo: ${suggestion.name}${suggestion.reason ? ` - ${suggestion.reason}` : ""}`,
+      memory_type: "note",
+      tags: ["recipe", "photo", "upload"],
+      importance: 0.8,
+      metadata: {
+        source: "food-photo-upload",
+        recipe_name: suggestion.name,
+        ingredients: suggestion.ingredients || [],
+        reason: suggestion.reason || "",
+      },
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["memories"] });
+      qc.invalidateQueries({ queryKey: ["memory-categories"] });
+    },
   });
 
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
@@ -95,6 +146,122 @@ export default function MemoryPage() {
         )}
       </div>
 
+      {/* Uploads */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Upload Bill or Recipe
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Upload a bill, recipe PDF, TXT, DOCX, or even a photo of the document.
+              The file is ingested into household memory so the text can be searched later.
+            </p>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.md,image/*"
+              onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm"
+            />
+            <div className="flex items-center gap-2">
+              <Button onClick={() => uploadDocument.mutate()} disabled={uploadDocument.isPending || !documentFile}>
+                {uploadDocument.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                Save to Memory
+              </Button>
+              {documentFile && <span className="text-xs text-muted-foreground">{documentFile.name}</span>}
+            </div>
+            {documentUpload && (
+              <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                <p className="font-medium">{documentUpload.filename} uploaded</p>
+                <p className="text-muted-foreground">Ingestion is running in the background and will add the text to memory search.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Upload Grocery Photo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Upload a grocery picture or food photo to detect ingredients and get recipe ideas.
+            </p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFoodImageFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm"
+            />
+            <div className="flex items-center gap-2">
+              <Button onClick={() => uploadFoodImage.mutate()} disabled={uploadFoodImage.isPending || !foodImageFile}>
+                {uploadFoodImage.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Analyze Photo
+              </Button>
+              {foodImageFile && <span className="text-xs text-muted-foreground">{foodImageFile.name}</span>}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {foodUpload && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Photo Analysis</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {foodUpload.analysis?.summary && (
+              <p className="text-sm text-muted-foreground">{foodUpload.analysis.summary}</p>
+            )}
+            {(foodUpload.food_items || []).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {(foodUpload.food_items || []).map((item: any, index: number) => (
+                  <Badge key={`${item?.name ?? "food"}-${index}`} variant="secondary">
+                    {item?.name ?? String(item)}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {(foodUpload.recipes || []).length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Suggested recipes</p>
+                {(foodUpload.recipes || []).map((recipe: any, index: number) => (
+                  <div key={`${recipe?.name ?? "recipe"}-${index}`} className="rounded-md border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{recipe?.name ?? "Unnamed recipe"}</p>
+                        {recipe?.reason && <p className="text-xs text-muted-foreground">{recipe.reason}</p>}
+                        {(recipe?.ingredients || []).length > 0 && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Ingredients: {(recipe.ingredients || []).join(", ")}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => saveSuggestedRecipe.mutate(recipe)}
+                        disabled={saveSuggestedRecipe.isPending}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No recipe suggestions were returned for this photo.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Add memory */}
       <Card>
         <CardHeader><CardTitle className="text-base">Store New Memory</CardTitle></CardHeader>
@@ -104,7 +271,7 @@ export default function MemoryPage() {
               e.preventDefault();
               store.mutate({
                 content: form.content,
-                category: form.category,
+                memory_type: form.memory_type,
                 tags: form.tags ? form.tags.split(",").map((t) => t.trim()) : [],
                 importance: parseFloat(form.importance),
               });
@@ -119,8 +286,8 @@ export default function MemoryPage() {
               className="sm:col-span-2 h-20 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <select
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              value={form.memory_type}
+              onChange={(e) => setForm({ ...form, memory_type: e.target.value })}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             >
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}

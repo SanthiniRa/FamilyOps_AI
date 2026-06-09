@@ -4,8 +4,19 @@ from sqlalchemy import select
 from datetime import datetime, timedelta, date
 from app.db.database import get_db
 from app.db.models import Task, CalendarEvent, GroceryList, MealPlan, Reminder, AgentRun, HouseholdMemory, FamilyMember
+from app.observability.token_tracker import (
+    token_tracker
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+def _normalize_json_value(value, fallback):
+    if value is None:
+        return fallback
+    if isinstance(value, type(fallback)):
+        return value
+    return fallback
 
 
 @router.get("/summary")
@@ -54,7 +65,17 @@ async def dashboard_summary(db: AsyncSession = Depends(get_db)):
     return {
         "family": {
             "member_count": len(members),
-            "members": [{"id": m.id, "name": m.name, "role": m.role, "avatar_url": m.avatar_url} for m in members],
+            "members": [
+                {
+                    "id": m.id,
+                    "name": m.name,
+                    "role": m.role,
+                    "avatar_url": m.avatar_url,
+                    "preferences": _normalize_json_value(m.preferences, {}),
+                    "dietary_restrictions": _normalize_json_value(m.dietary_restrictions, []),
+                }
+                for m in members
+            ],
         },
         "tasks": {
             "total": len(tasks),
@@ -122,4 +143,30 @@ async def health():
         "service": "FamilyOps AI",
         "version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat(),
+    }
+
+@router.get("/metrics")
+
+async def metrics():
+
+    from app.observability.metrics import (
+        REQUEST_COUNTER,
+        AGENT_COUNTER,
+    )
+
+    return {
+        "requests":
+        REQUEST_COUNTER._value.get(),
+
+        "agents":
+        AGENT_COUNTER.collect(),
+    }
+
+
+
+@router.get("/observability")
+async def observability():
+
+    return {
+        "tokens": token_tracker.metrics()
     }

@@ -30,10 +30,10 @@ export const tasksApi = {
       cleanParams.status = params.status;
     }
 
-    return api.get("/tasks/", { params: cleanParams });
+    return api.get("/tasks", { params: cleanParams });
   },
 
-  create: (data: unknown) => api.post("/tasks/", data),
+  create: (data: unknown) => api.post("/tasks", data),
 
   get: (id: string) => api.get(`/tasks/${id}`),
 

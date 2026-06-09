@@ -216,7 +216,7 @@ export default function TasksPage() {
         ) : tasks.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">
-              No tasks found in "{filterStatus}"
+              No tasks found in &quot;{filterStatus}&quot;
             </CardContent>
           </Card>
         ) : (

@@ -24,6 +24,7 @@ const MEAL_COLORS: Record<string, string> = {
 export default function MealsPage() {
   const qc = useQueryClient();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const selectedWeekKey = weekStart.toISOString().slice(0, 10);
 
   const { data: plans = [] } = useQuery({
     queryKey: ["meal-plans"],
@@ -41,8 +42,8 @@ export default function MealsPage() {
   });
 
   const currentPlan = plans.find((p: any) => {
-    const pStart = new Date(p.week_start);
-    return pStart.toDateString() === weekStart.toDateString();
+    if (!p.week_start) return false;
+    return new Date(p.week_start).toISOString().slice(0, 10) === selectedWeekKey;
   });
 
   return (
@@ -77,6 +78,19 @@ export default function MealsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {currentPlan?.warnings?.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardContent className="py-3">
+            <p className="text-sm font-medium text-amber-900">Plan fallback used</p>
+            <ul className="mt-1 list-disc pl-5 text-sm text-amber-900/80">
+              {currentPlan.warnings.map((warning: string) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Meal Grid */}
       {currentPlan ? (

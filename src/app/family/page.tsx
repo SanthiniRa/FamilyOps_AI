@@ -12,14 +12,65 @@ import { formatDate, getInitials } from "@/lib/utils";
 const ROLES = ["admin", "parent", "child", "member"];
 const AVATAR_COLORS = ["from-blue-400 to-indigo-600", "from-pink-400 to-rose-600", "from-green-400 to-teal-600", "from-yellow-400 to-orange-600", "from-purple-400 to-violet-600"];
 
+function parseJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item));
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item));
+      }
+    } catch {
+      return [value];
+    }
+  }
+
+  return [];
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function normalizeMember(member: any) {
+  return {
+    ...member,
+    preferences: parseJsonObject(member?.preferences),
+    dietary_restrictions: parseJsonArray(member?.dietary_restrictions),
+  };
+}
+
 export default function FamilyPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState({ name: "", email: "", role: "member", dietary_restrictions: "" });
-
-  const { data: members = [], isLoading } = useQuery({
+  const {
+    data: members = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["family-members"],
     queryFn: () => familyApi.list().then((r) => r.data),
   });
+
+  const normalizedMembers = Array.isArray(members) ? members.map(normalizeMember) : [];
 
   const create = useMutation({
     mutationFn: (data: any) => familyApi.create(data),
@@ -56,7 +107,15 @@ export default function FamilyPage() {
       {/* Member Grid */}
       {isLoading ? (
         <p className="text-center text-muted-foreground">Loading...</p>
-      ) : members.length === 0 ? (
+      ) : error ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Users className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+            <p className="text-muted-foreground">Could not load family members.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Check the backend connection and API response.</p>
+          </CardContent>
+        </Card>
+      ) : normalizedMembers.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
@@ -65,7 +124,7 @@ export default function FamilyPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {members.map((m: any, i: number) => (
+          {normalizedMembers.map((m: any, i: number) => (
             <Card key={m.id}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-4">
@@ -96,7 +155,9 @@ export default function FamilyPage() {
                     <Badge key={d} variant="outline" className="text-xs">{d}</Badge>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground">Added {formatDate(m.created_at)}</p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {m.created_at ? `Added ${formatDate(m.created_at)}` : "Recently added"}
+                </p>
               </CardContent>
             </Card>
           ))}

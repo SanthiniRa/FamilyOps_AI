@@ -28,6 +28,7 @@ class ReminderUpdate(BaseModel):
     recurrence: Optional[str] = None
 
 
+@router.get("", response_model=List[dict])
 @router.get("/", response_model=List[dict])
 async def list_reminders(
     status: Optional[str] = Query(None),
@@ -53,6 +54,7 @@ async def list_reminders(
     ]
 
 
+@router.post("", status_code=201)
 @router.post("/", status_code=201)
 async def create_reminder(reminder: ReminderCreate, db: AsyncSession = Depends(get_db)):
     db_reminder = Reminder(**reminder.model_dump())
@@ -63,6 +65,8 @@ async def create_reminder(reminder: ReminderCreate, db: AsyncSession = Depends(g
         "title": db_reminder.title,
         "remind_at": str(db_reminder.remind_at),
     })
+    await db.commit()
+    await db.refresh(db_reminder)
     return {
         "id": db_reminder.id, "title": db_reminder.title,
         "remind_at": db_reminder.remind_at, "status": db_reminder.status,
@@ -70,6 +74,7 @@ async def create_reminder(reminder: ReminderCreate, db: AsyncSession = Depends(g
 
 
 @router.get("/{reminder_id}")
+@router.get("/{reminder_id}/")
 async def get_reminder(reminder_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
@@ -84,6 +89,7 @@ async def get_reminder(reminder_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{reminder_id}")
+@router.patch("/{reminder_id}/")
 async def update_reminder(
     reminder_id: str, update: ReminderUpdate, db: AsyncSession = Depends(get_db)
 ):
@@ -93,19 +99,23 @@ async def update_reminder(
         raise HTTPException(status_code=404, detail="Reminder not found")
     for field, value in update.model_dump(exclude_unset=True).items():
         setattr(reminder, field, value)
+    await db.commit()
     return {"id": reminder.id, "title": reminder.title, "status": reminder.status}
 
 
 @router.delete("/{reminder_id}", status_code=204)
+@router.delete("/{reminder_id}/", status_code=204)
 async def delete_reminder(reminder_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
     await db.delete(reminder)
+    await db.commit()
 
 
 @router.get("/upcoming/today")
+@router.get("/upcoming/today/")
 async def upcoming_today(db: AsyncSession = Depends(get_db)):
     from datetime import date
     today = datetime.combine(date.today(), datetime.min.time())

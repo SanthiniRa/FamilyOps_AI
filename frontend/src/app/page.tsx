@@ -23,7 +23,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground text-sm">
-          Welcome back — here's what's happening today
+          Welcome back — here&apos;s what&apos;s happening today
         </p>
       </div>
 

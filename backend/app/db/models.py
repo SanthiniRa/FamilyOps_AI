@@ -192,7 +192,7 @@ class MealPlan(Base):
     nutritional_summary = Column(JSON, default=dict)
     generated_by_ai = Column(Boolean, default=False)
     preferences_used = Column(JSON, default=dict)
-
+    result = Column(JSON)  
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

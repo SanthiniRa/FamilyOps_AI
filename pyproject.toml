@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "repl-nix-workspace"
 version = "0.1.0"
@@ -13,6 +17,8 @@ dependencies = [
     "langchain-google-genai>=4.2.3",
     "langchain-openai>=1.2.2",
     "langgraph>=1.2.2",
+    "deepeval>=0.21.0",
+    "ragas>=0.1.10",
     "openai>=2.38.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
@@ -30,3 +36,9 @@ dependencies = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
 ]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["evaluation*"]
