@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 from app.core.config import settings
+from app.core.prompt_versioning import prompt_metadata
 from app.core.logging import logger
 from app.events.bus import event_bus
 from app.services.agent_actions import (
@@ -14,7 +15,13 @@ from app.services.openai_utils import (
     is_openai_model_not_found_error,
     openai_chat_model_candidates,
 )
+from app.services.weather_service import weather_service
+from app.services.event_search_service import event_search_service
+from app.services.recipe_search_service import recipe_search_service
+from app.services.web_search_service import web_search_service
+from app.services.privacy import redact_pii
 import operator
+import re
 from datetime import datetime
 
 
@@ -87,8 +94,57 @@ def _is_create_request(message: str, keywords: List[str]) -> bool:
     return any(word in lower for word in action_words) and any(keyword in lower for keyword in keywords)
 
 
+def _strip_trailing_time_words(value: str) -> str:
+    cleaned = value.strip(" .,!?:;")
+    for suffix in [
+        " today",
+        " tomorrow",
+        " this week",
+        " next week",
+        " tonight",
+        " now",
+    ]:
+        if cleaned.lower().endswith(suffix):
+            cleaned = cleaned[: -len(suffix)]
+    return cleaned.strip(" .,!?:;")
+
+
+def _extract_location_from_message(message: str) -> Optional[str]:
+    text = message.strip()
+    patterns = [
+        r"(?:weather|forecast|events?|things to do|activities|family events?|kids activities?)\s+(?:in|near|for)\s+(.*)$",
+        r"(?:in|near|for)\s+([A-Za-z0-9 ,'-]+)$",
+    ]
+    lower = text.lower()
+    for pattern in patterns:
+        match = re.search(pattern, lower, re.IGNORECASE)
+        if match:
+            value = text[match.start(1): match.end(1)]
+            return _strip_trailing_time_words(value)
+    return None
+
+
+def _extract_recipe_query(message: str) -> str:
+    text = message.strip()
+    patterns = [
+        r"^(?:recipe|recipes)\s+(?:for|of)\s+(.*)$",
+        r"^(?:find|search|show|suggest)\s+(?:a\s+)?(?:recipe|recipes)\s+(?:for|of)?\s*(.*)$",
+        r"^(?:how do i make|how to make|cook|bake)\s+(.*)$",
+    ]
+    for pattern in patterns:
+        match = re.match(pattern, text, re.IGNORECASE)
+        if match and match.group(1).strip():
+            return match.group(1).strip()
+    return text
+
+
+def _matches_any(text: str, phrases: List[str]) -> bool:
+    lowered = text.lower()
+    return any(phrase in lowered for phrase in phrases)
+
+
 SYSTEM_PROMPT = """You are FamilyOps AI, a warm, practical household operations assistant.
-You help families manage tasks, calendars, grocery lists, meal plans, reminders, and household memory.
+You help families manage tasks, calendars, grocery lists, meal plans, reminders, weather, local events, recipes, and household memory.
 
 Guidelines:
 - Be concise, friendly, and helpful — like a knowledgeable family organizer.
@@ -100,7 +156,7 @@ Guidelines:
 """
 
 INTENT_PROMPT = """Classify this message into exactly one category.
-Categories: task, calendar, grocery, meal, reminder, memory, email, shopping, general
+Categories: task, calendar, grocery, meal, recipe, weather, event, reminder, memory, email, shopping, web, general
 
 Message: {message}
 
@@ -138,6 +194,10 @@ class FamilyOpsOrchestrator:
         graph.add_node("memory_agent", self._memory_agent_node)
         graph.add_node("email_agent", self._email_agent_node)
         graph.add_node("shopping_agent", self._shopping_agent_node)
+        graph.add_node("weather_agent", self._weather_agent_node)
+        graph.add_node("event_agent", self._event_agent_node)
+        graph.add_node("recipe_agent", self._recipe_agent_node)
+        graph.add_node("web_search_agent", self._web_search_agent_node)
         graph.add_node("general_agent", self._general_agent_node)
 
         graph.set_entry_point("router")
@@ -155,12 +215,17 @@ class FamilyOpsOrchestrator:
                 "memory": "memory_agent",
                 "email": "email_agent",
                 "shopping": "shopping_agent",
+                "weather": "weather_agent",
+                "event": "event_agent",
+                "recipe": "recipe_agent",
+                "web": "web_search_agent",
                 "general": "general_agent",
             }
         )
 
         for node in ["task_agent", "payment_agent","calendar_agent", "grocery_agent", "meal_agent",
-                     "reminder_agent", "memory_agent", "email_agent", "shopping_agent", "general_agent"]:
+                     "reminder_agent", "memory_agent", "email_agent", "shopping_agent", "weather_agent",
+                     "event_agent", "recipe_agent", "web_search_agent", "general_agent"]:
             graph.add_edge(node, END)
 
         return graph.compile()
@@ -214,6 +279,16 @@ class FamilyOpsOrchestrator:
         return tokens
 
     async def _detect_intent(self, message: str) -> str:
+        lower = message.lower()
+
+        # Fast-path routes for the new external providers.
+        if _matches_any(lower, ["weather", "forecast", "temperature", "rain", "wind", "snow", "sunny", "cloudy", "hail"]):
+            return "weather"
+        if _matches_any(lower, ["family event", "family events", "events near", "local event", "local events", "things to do", "kids activities", "children activities", "near me"]):
+            return "event"
+        if _matches_any(lower, ["recipe", "recipes", "how do i make", "how to make", "cook this", "meal idea", "dish idea", "bake"]):
+            return "recipe"
+
         if self.llm:
             trace = start_ai_trace(
                 "orchestrator.intent",
@@ -221,6 +296,7 @@ class FamilyOpsOrchestrator:
                 metadata={
                     "provider": self.llm_provider,
                     "model": self.llm_model,
+                    **prompt_metadata("orchestrator.intent"),
                 },
             )
             try:
@@ -228,7 +304,22 @@ class FamilyOpsOrchestrator:
                 chain = prompt | self.llm
                 result = await chain.ainvoke({"message": message})
                 intent = result.content.strip().lower().split()[0]
-                valid = {"task", "calendar", "payment","grocery", "meal", "reminder", "memory", "email", "shopping", "general"}
+                valid = {
+                    "task",
+                    "calendar",
+                    "payment",
+                    "grocery",
+                    "meal",
+                    "recipe",
+                    "weather",
+                    "event",
+                    "reminder",
+                    "memory",
+                    "email",
+                    "shopping",
+                    "web",
+                    "general",
+                }
                 end_ai_generation(
                     trace,
                     name="orchestrator.intent",
@@ -238,6 +329,7 @@ class FamilyOpsOrchestrator:
                     metadata={
                         "provider": self.llm_provider,
                         "model": self.llm_model,
+                        **prompt_metadata("orchestrator.intent"),
                     },
                 )
                 return intent if intent in valid else "general"
@@ -251,6 +343,7 @@ class FamilyOpsOrchestrator:
                     metadata={
                         "provider": self.llm_provider,
                         "model": self.llm_model,
+                        **prompt_metadata("orchestrator.intent"),
                     },
                     level="ERROR",
                     status_message=str(e),
@@ -258,14 +351,14 @@ class FamilyOpsOrchestrator:
                 logger.warning("orchestrator.intent_fallback", error=str(e))
 
         # Keyword fallback
-        lower = message.lower()
         keywords = {
             "task": ["task", "todo", "chore", "assign", "complete", "finish"],
-            "calendar": ["calendar", "event", "schedule", "appointment", "meeting"],
+            "calendar": ["calendar", "schedule", "appointment", "meeting", "invite", "reschedule", "event", "add event"],
             "payment": ["pay", "bill", "invoice", "charge", "payment"], 
             "grocery": ["grocery", "list", "food"],
             "shopping": ["shop", "shopping", "buy", "product", "price", "recommend", "store", "deal"],
-            "meal": ["meal", "recipe", "dinner", "lunch", "breakfast", "cook", "eat"],
+            "web": ["web", "look up", "lookup", "latest", "current", "news", "online", "internet", "find online"],
+            "meal": ["meal", "dinner", "lunch", "breakfast", "cook", "eat", "meal plan", "weekly meals"],
             "reminder": ["remind", "reminder", "alert", "notify", "alarm"],
             "memory": ["remember", "memory", "store", "note", "know"],
             "email": ["email", "mail", "inbox", "message"],
@@ -281,21 +374,23 @@ class FamilyOpsOrchestrator:
                 f"⚠️ No AI key configured. Add **OPENAI_API_KEY** to `backend/.env` to enable real responses.\n\n"
                 f"Your message was routed to the **{agent_label}** agent."
             )
+        safe_context_text = redact_pii(context_text, source=f"orchestrator.{agent_label.lower()}", field="context")
         trace = start_ai_trace(
             f"orchestrator.{agent_label.lower()}",
             input={
-                "context": context_text,
+                "context": safe_context_text,
                 "message": user_message,
             },
             metadata={
                 "provider": self.llm_provider,
                 "model": self.llm_model,
                 "agent": agent_label,
+                **prompt_metadata("orchestrator.system"),
             },
         )
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=f"{context_text}\n\nUser: {user_message}" if context_text else user_message),
+            HumanMessage(content=f"{safe_context_text}\n\nUser: {user_message}" if safe_context_text else user_message),
         ]
         try:
             response = await self.llm.ainvoke(messages)
@@ -312,6 +407,7 @@ class FamilyOpsOrchestrator:
                     "provider": self.llm_provider,
                     "model": self.llm_model,
                     "agent": agent_label,
+                    **prompt_metadata("orchestrator.system"),
                 },
             )
             return response.content
@@ -338,6 +434,7 @@ class FamilyOpsOrchestrator:
                                 "model": self.llm_model,
                                 "agent": agent_label,
                                 "fallback": True,
+                                **prompt_metadata("orchestrator.system"),
                             },
                         )
                         logger.warning(
@@ -379,6 +476,7 @@ class FamilyOpsOrchestrator:
                                 "model": self.llm_model,
                                 "agent": agent_label,
                                 "fallback": True,
+                                **prompt_metadata("orchestrator.system"),
                             },
                         )
                         logger.warning(
@@ -458,6 +556,7 @@ class FamilyOpsOrchestrator:
                                     "model": self.llm_model,
                                     "agent": agent_label,
                                     "fallback": True,
+                                    **prompt_metadata("orchestrator.system"),
                                 },
                             )
                             logger.warning(
@@ -485,6 +584,7 @@ class FamilyOpsOrchestrator:
                     "provider": self.llm_provider,
                     "model": self.llm_model,
                     "agent": agent_label,
+                    **prompt_metadata("orchestrator.system"),
                 },
                 level="ERROR",
                 status_message=str(e),
@@ -698,6 +798,181 @@ class FamilyOpsOrchestrator:
         context_text = "Shopping assistance available: search products, compare prices, get recommendations, find alternatives, track prices, and view favorites."
         reply = await self._call_llm(message, context_text, "Shopping", state)
         state["reply"] = reply
+        state["status"] = "completed"
+        await self._finish(state)
+        return state
+
+    # ─── Weather Agent ─────────────────────────────────────────────────────────
+
+    async def _weather_agent_node(self, state: AgentState) -> AgentState:
+        state["tools_called"].append("weather_agent")
+        message = state["messages"][-1].content
+        location = _extract_location_from_message(message) or message
+
+        try:
+            weather = await weather_service.search(location, forecast_days=5)
+        except Exception as e:
+            logger.warning("weather.search_failed", error=str(e))
+            state["reply"] = f"I couldn’t fetch the weather right now: {str(e)}"
+            state["status"] = "completed"
+            await self._finish(state)
+            return state
+
+        context_lines = [f"Weather for {weather.get('location', {}).get('name', location)}"]
+        current = weather.get("current") or {}
+        if current:
+            context_lines.append(
+                f"Current: {current.get('temperature')}°C, {current.get('summary')}, wind {current.get('wind_speed')} km/h"
+            )
+        for day in (weather.get("daily") or [])[:5]:
+            context_lines.append(
+                f"{day.get('date')}: {day.get('summary')} | {day.get('temperature_min')}°C to {day.get('temperature_max')}°C"
+            )
+
+        context_text = "\n".join(context_lines)
+        reply = await self._call_llm(message, context_text, "Weather", state) if self.llm else context_text
+        state["reply"] = reply
+        state["context"]["resource"] = {
+            "type": "weather_search",
+            "query": message,
+            "location": weather.get("location", {}),
+            "current": current,
+            "daily": weather.get("daily") or [],
+        }
+        state["status"] = "completed"
+        await self._finish(state)
+        return state
+
+    # ─── Event Agent ───────────────────────────────────────────────────────────
+
+    async def _event_agent_node(self, state: AgentState) -> AgentState:
+        state["tools_called"].append("event_agent")
+        message = state["messages"][-1].content
+        location = _extract_location_from_message(message)
+
+        try:
+            events = await event_search_service.search(
+                query=message,
+                location=location,
+                family_friendly=True,
+                max_results=8,
+            )
+        except Exception as e:
+            logger.warning("events.search_failed", error=str(e))
+            state["reply"] = f"I couldn’t search local events right now: {str(e)}"
+            state["status"] = "completed"
+            await self._finish(state)
+            return state
+
+        results = events.get("results") or []
+        context_lines = [f"Local events for {location or 'your area'}"]
+        for idx, item in enumerate(results[:8], start=1):
+            venue = item.get("venue") or {}
+            when = " ".join(part for part in [item.get("date"), item.get("time")] if part)
+            place = ", ".join(
+                part for part in [
+                    venue.get("name"),
+                    venue.get("city"),
+                    venue.get("country"),
+                ] if part
+            )
+            context_lines.append(f"{idx}. {item.get('name')} - {when} - {place}")
+
+        context_text = "\n".join(context_lines) if results else "No local family-friendly events were found."
+        reply = await self._call_llm(message, context_text, "Events", state) if self.llm else context_text
+        state["reply"] = reply
+        state["context"]["resource"] = {
+            "type": "event_search",
+            "query": message,
+            "location": location,
+            "results": results,
+        }
+        state["status"] = "completed"
+        await self._finish(state)
+        return state
+
+    # ─── Recipe Agent ──────────────────────────────────────────────────────────
+
+    async def _recipe_agent_node(self, state: AgentState) -> AgentState:
+        state["tools_called"].append("recipe_agent")
+        message = state["messages"][-1].content
+        query = _extract_recipe_query(message)
+
+        try:
+            recipes = await recipe_search_service.search(query, max_results=8)
+        except Exception as e:
+            logger.warning("recipes.search_failed", error=str(e))
+            state["reply"] = f"I couldn’t search recipes right now: {str(e)}"
+            state["status"] = "completed"
+            await self._finish(state)
+            return state
+
+        results = recipes.get("results") or []
+        context_lines = [f"Recipe search results for: {query}"]
+        for idx, item in enumerate(results[:8], start=1):
+            ingredients = ", ".join((item.get("ingredients") or [])[:6])
+            context_lines.append(
+                f"{idx}. {item.get('name')} ({item.get('category')}, {item.get('area')})"
+                f"\n   Ingredients: {ingredients}"
+            )
+
+        context_text = "\n".join(context_lines) if results else "No recipes were found."
+        reply = await self._call_llm(message, context_text, "Recipe", state) if self.llm else context_text
+        state["reply"] = reply
+        state["context"]["resource"] = {
+            "type": "recipe_search",
+            "query": query,
+            "results": results,
+        }
+        state["status"] = "completed"
+        await self._finish(state)
+        return state
+
+    # ─── Web Search Agent ─────────────────────────────────────────────────────
+
+    async def _web_search_agent_node(self, state: AgentState) -> AgentState:
+        state["tools_called"].append("web_search_agent")
+        message = state["messages"][-1].content
+
+        try:
+            search_results = await web_search_service.search(
+                message,
+                max_results=5,
+                fetch_pages=True,
+            )
+        except Exception as e:
+            logger.warning("web_search.failed", error=str(e))
+            state["reply"] = f"I couldn’t search the web right now: {str(e)}"
+            state["status"] = "completed"
+            await self._finish(state)
+            return state
+
+        context_lines = [f"Web search results for: {search_results.get('query', message)}"]
+        for idx, item in enumerate(search_results.get("pages") or search_results.get("results") or [], start=1):
+            title = item.get("page_title") or item.get("title") or "Untitled"
+            url = item.get("url") or ""
+            snippet = item.get("page_description") or item.get("snippet") or ""
+            excerpt = item.get("page_excerpt") or ""
+            context_lines.append(
+                f"{idx}. {title}\n"
+                f"   URL: {url}\n"
+                f"   Snippet: {snippet or excerpt}"
+            )
+
+        context_text = "\n".join(context_lines)
+
+        if self.llm:
+            reply = await self._call_llm(message, context_text, "Web Search", state)
+        else:
+            reply = context_text
+
+        state["reply"] = reply
+        state["context"]["resource"] = {
+            "type": "web_search",
+            "query": search_results.get("query", message),
+            "provider": search_results.get("provider", "duckduckgo"),
+            "results": search_results.get("pages") or search_results.get("results") or [],
+        }
         state["status"] = "completed"
         await self._finish(state)
         return state

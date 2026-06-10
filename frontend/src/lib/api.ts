@@ -58,7 +58,7 @@ export const groceryApi = {
 export const mealsApi = {
   listRecipes: () => api.get("/meals/recipes"),
   createRecipe: (data: unknown) => api.post("/meals/recipes", data),
-  listPlans: () => api.get("/meals/plans"),
+  listPlans: (params?: { week_start?: string }) => api.get("/meals/plans", { params }),
   generatePlan: (data: unknown) => api.post("/meals/plans/generate", data),
   getPlan: (id: string) => api.get(`/meals/plans/${id}`),
 };

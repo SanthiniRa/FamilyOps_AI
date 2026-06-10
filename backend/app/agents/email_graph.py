@@ -5,10 +5,12 @@ from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from app.core.config import settings
 from app.observability.langfuse_client import start_ai_trace, end_ai_generation
+from app.core.prompt_versioning import prompt_metadata
 from app.services.openai_utils import (
     is_openai_model_not_found_error,
     openai_chat_model_candidates,
 )
+from app.services.privacy import redact_pii_in_obj
 import json
 import re
 from datetime import datetime, timezone
@@ -193,9 +195,10 @@ async def _persist_email_result(email_id: Optional[str], tasks: List[Dict[str, A
 # ============================================================
 async def extract_node(state: EmailState):
     email = state["email"]
+    safe_email = redact_pii_in_obj(email, source="email.extract")
     attachment_count = len(email.get("attachments", []) or [])
-    attachment_text = _clean_text(email.get("attachment_text"))
-    body_html = _clean_text(email.get("body_html"))
+    attachment_text = _clean_text(safe_email.get("attachment_text"))
+    body_html = _clean_text(safe_email.get("body_html"))
 
     prompt = f"""
 Extract structured data from this email.
@@ -208,9 +211,9 @@ Return JSON:
 }}
 
 Email:
-Subject: {email.get("subject", "")}
-Sender: {email.get("sender", "")}
-{email["body_text"]}
+Subject: {safe_email.get("subject", "")}
+Sender: {safe_email.get("sender", "")}
+{safe_email.get("body_text", "")}
 
 Attachment count: {attachment_count}
 
@@ -234,6 +237,7 @@ Rules:
         metadata={
             "subject": email.get("subject", ""),
             "sender": email.get("sender", ""),
+            **prompt_metadata("email.extract"),
         },
     )
     for model_name in openai_chat_model_candidates():
@@ -253,6 +257,7 @@ Rules:
                 metadata={
                     "subject": email.get("subject", ""),
                     "sender": email.get("sender", ""),
+                    **prompt_metadata("email.extract"),
                 },
             )
             break
@@ -268,6 +273,7 @@ Rules:
                     metadata={
                         "subject": email.get("subject", ""),
                         "sender": email.get("sender", ""),
+                        **prompt_metadata("email.extract"),
                     },
                     level="ERROR",
                     status_message=str(e),
@@ -284,6 +290,7 @@ Rules:
             metadata={
                 "subject": email.get("subject", ""),
                 "sender": email.get("sender", ""),
+                **prompt_metadata("email.extract"),
             },
             level="ERROR",
             status_message=str(last_error) if last_error else "Unknown error",
@@ -306,7 +313,7 @@ Rules:
     memory = data.get("memory", []) or []
 
     if not tasks:
-        tasks = _extract_fallback_tasks(email)
+        tasks = _extract_fallback_tasks(safe_email)
 
     return {
         **state,
@@ -341,17 +348,22 @@ async def router_node(state: EmailState):
 # ============================================================
 async def executor_node(state: EmailState):
     routing = state.get("routing", [])
+    auth_context = state.get("context", {}).get("auth", {}) if isinstance(state.get("context"), dict) else {}
+    owner_family_member_id = auth_context.get("family_member_id")
 
     for action_type, payload in routing:
+        enriched_payload = dict(payload)
+        if owner_family_member_id:
+            enriched_payload.setdefault("owner_family_member_id", owner_family_member_id)
 
         if action_type == "task":
-            await tools.create_task(payload)
+            await tools.create_task(enriched_payload)
 
         elif action_type == "calendar":
-            await tools.create_event(payload)
+            await tools.create_event(enriched_payload)
 
         elif action_type == "memory":
-            await tools.store_memory(payload)
+            await tools.store_memory(enriched_payload)
 
     await _persist_email_result(
         state.get("email", {}).get("id"),

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from difflib import SequenceMatcher
+from functools import lru_cache
+import math
 import json
 import re
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -57,6 +60,24 @@ _MEMORY_TYPE_HINTS = {
 class Chunk:
     content: str
     metadata: Dict[str, Any]
+
+
+@dataclass
+class BM25Corpus:
+    documents: List[List[str]]
+    document_frequencies: Dict[str, int]
+    average_document_length: float
+
+
+class CrossEncoderScorer:
+    def __init__(self, model_name: str) -> None:
+        from sentence_transformers import CrossEncoder
+
+        self.model_name = model_name
+        self.model = CrossEncoder(model_name)
+
+    def predict(self, pairs: Sequence[Tuple[str, str]]) -> Sequence[float]:
+        return self.model.predict(list(pairs))
 
 
 def normalize_text(text: str) -> str:
@@ -288,6 +309,166 @@ def metadata_matches(candidate_metadata: Dict[str, Any], metadata_filter: Option
     return True
 
 
+def build_bm25_corpus(texts: Sequence[str]) -> BM25Corpus:
+    tokenized_documents = [tokenize(text) for text in texts if (text or "").strip()]
+    if not tokenized_documents:
+        return BM25Corpus(documents=[], document_frequencies={}, average_document_length=0.0)
+
+    document_frequencies: Counter[str] = Counter()
+    total_length = 0
+    for tokens in tokenized_documents:
+        document_frequencies.update(set(tokens))
+        total_length += len(tokens)
+
+    return BM25Corpus(
+        documents=tokenized_documents,
+        document_frequencies=dict(document_frequencies),
+        average_document_length=total_length / len(tokenized_documents),
+    )
+
+
+def bm25_score(
+    query: str,
+    document: str,
+    corpus: Optional[BM25Corpus] = None,
+    *,
+    k1: float = 1.5,
+    b: float = 0.75,
+) -> float:
+    query_tokens = list(dict.fromkeys(tokenize(query)))
+    document_tokens = tokenize(document)
+    if not query_tokens or not document_tokens:
+        return 0.0
+
+    corpus = corpus or build_bm25_corpus([document])
+    if not corpus.documents or corpus.average_document_length <= 0.0:
+        return 0.0
+
+    document_frequencies = corpus.document_frequencies
+    document_length = len(document_tokens)
+    total_documents = len(corpus.documents)
+    term_counts = Counter(document_tokens)
+
+    score = 0.0
+    length_normalizer = k1 * (1.0 - b + b * (document_length / corpus.average_document_length))
+    for term in query_tokens:
+        term_frequency = term_counts.get(term, 0)
+        if term_frequency <= 0:
+            continue
+
+        document_frequency = document_frequencies.get(term, 0)
+        idf = math.log(1.0 + ((total_documents - document_frequency + 0.5) / (document_frequency + 0.5)))
+        score += idf * (term_frequency * (k1 + 1.0)) / (term_frequency + length_normalizer)
+
+    return score
+
+
+def reciprocal_rank_fusion(rankings: Sequence[Sequence[Any]], *, k: int = 60) -> Dict[str, float]:
+    fused_scores: Dict[str, float] = defaultdict(float)
+    for ranking in rankings:
+        for rank, item in enumerate(ranking, start=1):
+            if isinstance(item, dict):
+                identifier = item.get("id")
+            else:
+                identifier = item
+            if identifier in (None, ""):
+                continue
+            fused_scores[str(identifier)] += 1.0 / (k + rank)
+    return dict(fused_scores)
+
+
+def rank_candidates_by_bm25(
+    query: str,
+    candidates: Sequence[Dict[str, Any]],
+    *,
+    metadata_filter: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    filtered_candidates: List[Dict[str, Any]] = []
+    candidate_texts: List[str] = []
+
+    for candidate in candidates:
+        content = (candidate.get("content") or "").strip()
+        if not content:
+            continue
+        if not metadata_matches(candidate, metadata_filter):
+            continue
+
+        filtered_candidates.append(dict(candidate))
+        candidate_texts.append(_candidate_text(candidate))
+
+    if not filtered_candidates:
+        return []
+
+    corpus = build_bm25_corpus(candidate_texts)
+    ranked_candidates: List[Dict[str, Any]] = []
+    for candidate, candidate_text in zip(filtered_candidates, candidate_texts):
+        candidate["bm25_score"] = bm25_score(query, candidate_text, corpus=corpus)
+        ranked_candidates.append(candidate)
+
+    ranked_candidates.sort(key=lambda item: item.get("bm25_score", 0.0), reverse=True)
+    for rank, candidate in enumerate(ranked_candidates, start=1):
+        candidate["bm25_rank"] = rank
+    return ranked_candidates
+
+
+@lru_cache(maxsize=1)
+def get_cross_encoder_scorer() -> Optional[CrossEncoderScorer]:
+    if not getattr(settings, "enable_cross_encoder_rerank", False):
+        return None
+
+    model_name = (getattr(settings, "cross_encoder_model", "") or "").strip()
+    if not model_name:
+        return None
+
+    try:
+        return CrossEncoderScorer(model_name)
+    except Exception:
+        return None
+
+
+def cross_encoder_rerank_candidates(
+    query: str,
+    candidates: Sequence[Dict[str, Any]],
+    *,
+    top_n: Optional[int] = None,
+    scorer: Optional[CrossEncoderScorer] = None,
+) -> List[Dict[str, Any]]:
+    if not candidates:
+        return []
+
+    ranked_candidates = [dict(candidate) for candidate in candidates]
+    for candidate in ranked_candidates:
+        candidate.setdefault("cross_encoder_score", 0.0)
+
+    scorer = scorer or get_cross_encoder_scorer()
+    if scorer is None:
+        return ranked_candidates
+
+    limit = len(ranked_candidates) if top_n is None else max(0, min(top_n, len(ranked_candidates)))
+    if limit <= 0:
+        return ranked_candidates
+
+    scored_slice = ranked_candidates[:limit]
+    pairs = [(query, _candidate_text(candidate)) for candidate in scored_slice]
+
+    try:
+        predictions = scorer.predict(pairs)
+    except Exception:
+        return ranked_candidates
+
+    for candidate, score in zip(scored_slice, predictions):
+        candidate["cross_encoder_score"] = float(score)
+
+    scored_slice.sort(
+        key=lambda item: float(item.get("cross_encoder_score", 0.0) or 0.0),
+        reverse=True,
+    )
+    for rank, candidate in enumerate(scored_slice, start=1):
+        candidate["cross_encoder_rank"] = rank
+
+    return scored_slice + ranked_candidates[limit:]
+
+
 def _candidate_text(candidate: Dict[str, Any]) -> str:
     content = candidate.get("content") or ""
     metadata = candidate.get("metadata") or {}
@@ -341,7 +522,7 @@ def rerank_candidates(
             existing = deduped[normalized]
             existing["score"] = max(existing.get("score", 0.0), candidate.get("score", 0.0))
             continue
-        if not metadata_matches(candidate.get("metadata", {}), metadata_filter):
+        if not metadata_matches(candidate, metadata_filter):
             continue
         candidate = dict(candidate)
         candidate["rerank_score"] = _score_candidate(
@@ -380,6 +561,9 @@ def _score_candidate(
     sequence = SequenceMatcher(None, normalize_text(query), normalize_text(content)).ratio()
     vector_score = float(candidate.get("vector_score", candidate.get("score", 0.0)) or 0.0)
     lexical_score = float(candidate.get("lexical_score", 0.0) or 0.0)
+    bm25 = float(candidate.get("bm25_score", 0.0) or 0.0)
+    rrf_score = float(candidate.get("rrf_score", 0.0) or 0.0)
+    cross_encoder = float(candidate.get("cross_encoder_score", 0.0) or 0.0)
     recency = float(candidate.get("recency_boost", 0.0) or 0.0)
 
     metadata_boost = 0.0
@@ -400,11 +584,18 @@ def _score_candidate(
     if memory_type and memory_type in normalize_text(query):
         source_bonus += 0.08
 
+    bm25_bonus = min(1.0, bm25 / (bm25 + 2.5)) if bm25 > 0.0 else 0.0
+    rrf_bonus = min(1.0, rrf_score * 30.0) if rrf_score > 0.0 else 0.0
+    cross_encoder_bonus = 1.0 / (1.0 + math.exp(-max(-20.0, min(20.0, cross_encoder)))) if cross_encoder else 0.0
+
     combined = (
-        0.34 * vector_score
-        + 0.26 * max(lexical, lexical_score)
-        + 0.18 * sequence
-        + 0.12 * recency
+        0.22 * vector_score
+        + 0.14 * max(lexical, lexical_score)
+        + 0.14 * bm25_bonus
+        + 0.10 * rrf_bonus
+        + 0.18 * cross_encoder_bonus
+        + 0.10 * sequence
+        + 0.06 * recency
         + metadata_boost
         + source_bonus
     )

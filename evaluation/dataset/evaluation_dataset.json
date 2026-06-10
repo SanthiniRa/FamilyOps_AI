@@ -1,10 +1,20 @@
 {
   "dataset_name": "familyops_synthetic_eval_v1",
+  "evaluation_version": "2026-06-10.1",
   "meta": {
     "description": "Synthetic regression dataset for routing, tool selection, RAG quality, answer quality, and hallucination checks.",
     "generated_at": "2026-06-09",
     "cases_per_domain": 10,
-    "total_cases": 40
+    "total_cases": 40,
+    "prompt_registry_version": "2026-06-10.1",
+    "prompt_versions": {
+      "orchestrator.system": "1.0.0",
+      "orchestrator.intent": "1.0.0",
+      "email.action_items": "1.0.0",
+      "email.extract": "1.0.0",
+      "grocery.suggestions": "1.0.0",
+      "meal.recipe_selection": "1.0.0"
+    }
   },
   "cases": [
     {

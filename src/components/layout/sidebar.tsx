@@ -3,9 +3,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, ShoppingCart, UtensilsCrossed,
-  Bell, Calendar, Brain, Users, Bot, Settings, Home
+  Bell, Calendar, Brain, Users, Bot, Settings, Home, LogOut, UserCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/auth/auth-provider";
+import { useRouter } from "next/navigation";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -22,6 +25,13 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, clearSession } = useAuth();
+
+  const handleLogout = () => {
+    clearSession();
+    router.replace("/login");
+  };
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-card">
@@ -51,13 +61,29 @@ export default function Sidebar() {
       </nav>
       <div className="border-t p-4">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-400 to-purple-600" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-600 text-white">
+            <UserCircle2 className="h-4 w-4" />
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium">Family Admin</p>
-            <p className="truncate text-xs text-muted-foreground">Connected</p>
+            <p className="truncate text-xs font-medium">
+              {user?.full_name || user?.email || "Family Admin"}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {user?.role || "Connected"}
+            </p>
           </div>
           <div className="h-2 w-2 rounded-full bg-green-400" />
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3 w-full justify-start gap-2"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </Button>
       </div>
     </aside>
   );

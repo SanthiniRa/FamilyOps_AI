@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time, timezone
 
 from app.db.database import get_db
 from app.db.models import MealPlan, Recipe
@@ -37,7 +37,7 @@ class RecipeCreate(BaseModel):
 
 
 class MealPlanCreate(BaseModel):
-    week_start: datetime
+    week_start: str
     preferences: Dict[str, Any] = Field(default_factory=dict)
     budget: Optional[float] = None
     pantry_inventory: Dict[str, Any] = Field(default_factory=dict)
@@ -88,10 +88,41 @@ async def create_recipe(recipe: RecipeCreate, db: AsyncSession = Depends(get_db)
 # MEAL PLANS
 # ============================================================
 
+def _normalize_week_start(value: str) -> datetime:
+    try:
+        parsed_date = date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="week_start must be an ISO date string (YYYY-MM-DD)",
+        ) from exc
+
+    return datetime.combine(parsed_date, time.min, tzinfo=timezone.utc)
+
+
+def _plan_week_start(plan_week_start: datetime) -> datetime:
+    if plan_week_start.tzinfo is None:
+        return plan_week_start.replace(tzinfo=timezone.utc)
+    return plan_week_start.astimezone(timezone.utc)
+
+
 @router.get("/plans")
-async def list_meal_plans(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(MealPlan).order_by(MealPlan.week_start.desc()))
+async def list_meal_plans(
+    week_start: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(MealPlan).order_by(MealPlan.week_start.desc(), MealPlan.created_at.desc())
+    )
     plans = result.scalars().all()
+
+    if week_start:
+        normalized_week_start = _normalize_week_start(week_start)
+        plans = [
+            plan
+            for plan in plans
+            if plan.week_start and _plan_week_start(plan.week_start) == normalized_week_start
+        ]
 
     return [
         {
@@ -137,9 +168,7 @@ async def generate_meal_plan(
     db: AsyncSession = Depends(get_db)
 ):
 
-    week_start = data.week_start.replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    week_start = _normalize_week_start(data.week_start)
     week_end = week_start + timedelta(days=6)
 
     # 1. preferences

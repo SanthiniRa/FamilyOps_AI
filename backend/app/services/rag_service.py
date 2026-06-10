@@ -134,6 +134,9 @@ class RAGService:
                 "content": item.get("content"),
                 "metadata": item.get("metadata", {}),
                 "score": item.get("score", 0.0),
+                "bm25_score": item.get("bm25_score", 0.0),
+                "rrf_score": item.get("rrf_score", 0.0),
+                "cross_encoder_score": item.get("cross_encoder_score", 0.0),
                 "citation": self._extract_citation(item.get("metadata", {})),
             }
             for item in results

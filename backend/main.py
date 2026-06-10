@@ -16,9 +16,11 @@ from app.observability.middleware import RequestLoggingMiddleware
 from app.api.routes import briefing
 
 from app.observability.tracing import tracer
+from app.core.resilience import shared_resilience_health
 
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.api.routes import (
+    auth,
     tasks,
     grocery,
     meals,
@@ -29,6 +31,10 @@ from app.api.routes import (
     agent,
     dashboard,
     uploads,
+    web_search,
+    weather,
+    events,
+    recipes,
 )
 
 # ============================================================
@@ -139,6 +145,7 @@ app.add_middleware(
 protected = [Depends(require_api_token)]
 
 app.include_router(dashboard.router, prefix="/api/v1", dependencies=protected)
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1", dependencies=protected)
 app.include_router(grocery.router, prefix="/api/v1", dependencies=protected)
 app.include_router(meals.router, prefix="/api/v1", dependencies=protected)
@@ -148,6 +155,10 @@ app.include_router(memory.router, prefix="/api/v1", dependencies=protected)
 app.include_router(family.router, prefix="/api/v1", dependencies=protected)
 app.include_router(agent.router, prefix="/api/v1", dependencies=protected)
 app.include_router(uploads.router, prefix="/api/v1", dependencies=protected)
+app.include_router(web_search.router, prefix="/api/v1", dependencies=protected)
+app.include_router(weather.router, prefix="/api/v1", dependencies=protected)
+app.include_router(events.router, prefix="/api/v1", dependencies=protected)
+app.include_router(recipes.router, prefix="/api/v1", dependencies=protected)
 app.include_router(briefing.router, dependencies=protected)
 
 Instrumentator().instrument(app).expose(app)
@@ -171,7 +182,9 @@ async def root():
 
 @app.get("/health")
 async def health():
+    resilience = await shared_resilience_health()
     return {
         "status": "healthy",
         "version": settings.app_version,
+        "shared_resilience_redis": resilience,
     }

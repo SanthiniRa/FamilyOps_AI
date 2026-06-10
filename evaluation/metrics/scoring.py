@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from statistics import mean
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 from .text_utils import (
     best_match_score,
@@ -17,6 +17,15 @@ from .text_utils import (
 
 def _clamp(score: float) -> float:
     return max(0.0, min(1.0, score))
+
+
+def estimate_token_count(text: str) -> int:
+    tokens = tokenize(text)
+    return max(1, len(tokens)) if text and text.strip() else 0
+
+
+def estimate_cost_units(input_tokens: int, output_tokens: int) -> float:
+    return max(0.0, (input_tokens + output_tokens) / 1000.0)
 
 
 def score_context_precision(retrieved_contexts: Sequence[str], expected_contexts: Sequence[str]) -> float:
@@ -50,6 +59,75 @@ def score_faithfulness(retrieved_contexts: Sequence[str], generated_answer: str)
 
 def score_answer_relevance(query: str, generated_answer: str) -> float:
     return _clamp((jaccard_similarity(query, generated_answer) + sequence_similarity(query, generated_answer)) / 2.0)
+
+
+def score_task_specific(
+    category: str,
+    query: str,
+    generated_answer: str,
+    reference_answer: str,
+    retrieved_contexts: Sequence[str],
+    expected_contexts: Sequence[str],
+) -> float:
+    category = (category or "").strip().lower()
+    base = best_match_score(generated_answer, [reference_answer, *expected_contexts, *retrieved_contexts])
+
+    query_tokens = set(tokenize(query))
+    answer_tokens = set(tokenize(generated_answer))
+    reference_tokens = set(tokenize(reference_answer))
+    context_tokens = set(tokenize(" ".join(expected_contexts + list(retrieved_contexts))))
+    overlap_bonus = 0.0
+
+    if category == "email_calendar":
+        cue_bonus = 0.0
+        if extract_numeric_tokens(generated_answer):
+            cue_bonus += 0.12
+        if any(word in answer_tokens for word in {"added", "scheduled", "created", "calendar"}):
+            cue_bonus += 0.12
+        if any(word in query_tokens for word in {"calendar", "schedule", "event", "appointment"}):
+            cue_bonus += 0.08
+        overlap_bonus = min(0.25, cue_bonus)
+    elif category == "meal_planning":
+        cue_bonus = 0.0
+        if any(word in answer_tokens for word in {"meal", "meals", "dinner", "dinners", "plan", "shopping", "budget"}):
+            cue_bonus += 0.10
+        if context_tokens & answer_tokens:
+            cue_bonus += 0.10
+        if reference_tokens & answer_tokens:
+            cue_bonus += 0.10
+        overlap_bonus = min(0.30, cue_bonus)
+    elif category == "memory_lookup":
+        cue_bonus = 0.0
+        if any(word in answer_tokens for word in {"remember", "saved", "memory", "note"}):
+            cue_bonus += 0.10
+        if context_tokens & answer_tokens:
+            cue_bonus += 0.15
+        overlap_bonus = min(0.30, cue_bonus)
+    else:
+        if context_tokens & answer_tokens:
+            overlap_bonus = 0.10
+
+    return _clamp((0.7 * base) + overlap_bonus)
+
+
+def score_error_handling(error_message: Optional[str], generated_answer: str) -> float:
+    if error_message:
+        if generated_answer and generated_answer.strip():
+            return 0.5
+        return 0.0
+    return 1.0 if generated_answer and generated_answer.strip() else 0.5
+
+
+def score_cost_efficiency(estimated_cost_units: float, budget_units: float = 2.0) -> float:
+    if budget_units <= 0:
+        return 1.0
+    return _clamp(1.0 - min(1.0, estimated_cost_units / budget_units))
+
+
+def score_latency_efficiency(latency_ms: float, budget_ms: float = 4000.0) -> float:
+    if budget_ms <= 0:
+        return 1.0
+    return _clamp(1.0 - min(1.0, latency_ms / budget_ms))
 
 
 def score_rag_quality(
@@ -154,17 +232,24 @@ def compute_final_score(
     hallucination_score: float,
     tool_selection_accuracy: float,
     routing_accuracy: float,
+    task_specific_score: float,
+    error_handling_score: float,
+    cost_efficiency: float,
+    latency_efficiency: float,
 ) -> Dict[str, float]:
     hallucination_penalty = _clamp(1.0 - hallucination_score)
     final_score = (
-        0.25 * rag_quality
-        + 0.25 * answer_quality
-        + 0.20 * hallucination_penalty
-        + 0.15 * tool_selection_accuracy
-        + 0.15 * routing_accuracy
+        0.20 * rag_quality
+        + 0.20 * answer_quality
+        + 0.15 * hallucination_penalty
+        + 0.10 * tool_selection_accuracy
+        + 0.10 * routing_accuracy
+        + 0.10 * task_specific_score
+        + 0.10 * error_handling_score
+        + 0.075 * cost_efficiency
+        + 0.075 * latency_efficiency
     )
     return {
         "hallucination_penalty": hallucination_penalty,
         "final_score": _clamp(final_score),
     }
-

@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
 from app.observability.langfuse_client import start_ai_trace, end_ai_generation
+from app.core.prompt_versioning import prompt_metadata
 from app.services.ingest_service import (
     _extract_text_from_docx,
     _extract_text_from_pdf,
@@ -211,7 +212,10 @@ class EmailProcessor:
         trace = start_ai_trace(
             "email.action_items",
             input={"email_body": email_body, "attachment_text": attachment_text},
-            metadata={"model": settings.openai_model},
+            metadata={
+                "model": settings.openai_model,
+                **prompt_metadata("email.action_items"),
+            },
         )
         prompt = f"""
 You are an email intelligence system.
@@ -268,7 +272,10 @@ ATTACHMENTS:
                     model=model_name,
                     input={"email_body": email_body, "attachment_text": attachment_text},
                     output=response.content,
-                    metadata={"model": model_name},
+                    metadata={
+                        "model": model_name,
+                        **prompt_metadata("email.action_items"),
+                    },
                 )
                 print("OpenAI returned")
                 break
@@ -282,7 +289,10 @@ ATTACHMENTS:
                         model=model_name,
                         input={"email_body": email_body, "attachment_text": attachment_text},
                         output=None,
-                        metadata={"model": model_name},
+                        metadata={
+                            "model": model_name,
+                            **prompt_metadata("email.action_items"),
+                        },
                         level="ERROR",
                         status_message=str(e),
                     )
@@ -296,7 +306,10 @@ ATTACHMENTS:
                 model=self.model_candidates[0] if self.model_candidates else settings.openai_model,
                 input={"email_body": email_body, "attachment_text": attachment_text},
                 output=None,
-                metadata={"model": self.model_candidates[0] if self.model_candidates else settings.openai_model},
+                metadata={
+                    "model": self.model_candidates[0] if self.model_candidates else settings.openai_model,
+                    **prompt_metadata("email.action_items"),
+                },
                 level="ERROR",
                 status_message=str(last_error),
             )

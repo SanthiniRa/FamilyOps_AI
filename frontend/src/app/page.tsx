@@ -140,6 +140,54 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Important Emails */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            Important Emails Today
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(d?.emails?.important_today ?? []).length === 0 ? (
+            <EmptySlot text="No important emails matched today" />
+          ) : (
+            (d?.emails?.important_today ?? []).map((email: any) => (
+              <div key={email.id} className="rounded-md border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{email.subject || "Untitled email"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {email.sender || "Unknown sender"}
+                      {email.received_at && ` • ${formatRelative(email.received_at)}`}
+                    </p>
+                  </div>
+                  <Badge variant="warning" className="shrink-0">
+                    {email.reason}
+                  </Badge>
+                </div>
+
+                {email.snippet && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {email.snippet}
+                  </p>
+                )}
+
+                {(email.matched_keywords ?? []).length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {(email.matched_keywords ?? []).map((keyword: string) => (
+                      <Badge key={keyword} variant="outline" className="text-xs">
+                        {keyword}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
       {/* Family Members */}
       {(d?.family?.members ?? []).length > 0 && (
         <Card>

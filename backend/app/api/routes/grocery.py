@@ -12,6 +12,7 @@ from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.observability.langfuse_client import start_ai_trace, end_ai_generation
+from app.core.prompt_versioning import prompt_metadata
 from app.db.database import get_db
 from app.db.models import GroceryList, GroceryItem, PantryItem, MealPlan, Memory, FamilyMember
 from app.events.bus import event_bus
@@ -239,7 +240,11 @@ async def _generate_ai_suggestions(
             trace = start_ai_trace(
                 "grocery.list_suggestions",
                 input=prompt,
-                metadata={"list_name": gl.name, "store": gl.store},
+                metadata={
+                    "list_name": gl.name,
+                    "store": gl.store,
+                    **prompt_metadata("grocery.suggestions"),
+                },
             )
             try:
                 response = await client.chat.completions.create(
@@ -265,7 +270,11 @@ async def _generate_ai_suggestions(
                     model=settings.openai_model,
                     input=prompt,
                     output=None,
-                    metadata={"list_name": gl.name, "store": gl.store},
+                    metadata={
+                        "list_name": gl.name,
+                        "store": gl.store,
+                        **prompt_metadata("grocery.suggestions"),
+                    },
                     level="ERROR",
                     status_message=str(exc),
                 )
@@ -279,7 +288,11 @@ async def _generate_ai_suggestions(
                 input=prompt,
                 output=raw,
                 usage=response.usage.model_dump() if response.usage else None,
-                metadata={"list_name": gl.name, "store": gl.store},
+                metadata={
+                    "list_name": gl.name,
+                    "store": gl.store,
+                    **prompt_metadata("grocery.suggestions"),
+                },
             )
             payload = json.loads(raw)
             items = payload.get("items", [])

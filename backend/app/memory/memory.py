@@ -8,11 +8,15 @@ from sqlalchemy import select, desc
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.models import Memory
+from app.services.privacy import redact_pii
 from app.services.rag_service import build_embeddings
 from app.services.rag_retrieval import (
     candidate_memory_types,
+    cross_encoder_rerank_candidates,
     metadata_matches,
     normalize_text,
+    reciprocal_rank_fusion,
+    rank_candidates_by_bm25,
     rerank_candidates,
     rewrite_retrieval_query,
     tokenize,
@@ -38,10 +42,15 @@ except ImportError:
 
 class MemoryService:
     def __init__(self):
-        self.embeddings = build_embeddings()
+        self.embeddings = None
         self.client = None
         self.collection_name = settings.qdrant_collection
         self.vector_size = 1536
+
+    async def _ensure_embeddings(self):
+        if self.embeddings is None:
+            self.embeddings = build_embeddings()
+        return self.embeddings
 
     async def init(self):
         if QdrantClient is None:
@@ -67,7 +76,8 @@ class MemoryService:
             )
 
     async def _embed_text(self, text: str) -> List[float]:
-        return await asyncio.to_thread(self.embeddings.embed_query, text)
+        embeddings = await self._ensure_embeddings()
+        return await asyncio.to_thread(embeddings.embed_query, text)
 
     def _build_payload(
         self,
@@ -116,12 +126,13 @@ class MemoryService:
 
         return {
             "id": memory.id,
-            "content": memory.content,
+            "content": redact_pii(memory.content or "", source="memory.serialize", field="content"),
             "memory_type": memory.memory_type,
             "category": memory.memory_type,
             "tags": tags,
             "importance": importance,
             "metadata": metadata,
+            "owner_family_member_id": metadata.get("owner_family_member_id"),
             "created_at": memory.created_at.isoformat() if memory.created_at else None,
             "updated_at": memory.updated_at.isoformat() if memory.updated_at else None,
             **({"score": score} if score is not None else {}),
@@ -150,6 +161,9 @@ class MemoryService:
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Memory).where(Memory.id == memory_id))
             return result.scalar_one_or_none()
+
+    async def get_memory(self, memory_id: str) -> Optional[Memory]:
+        return await self._load_memory_row(memory_id)
 
     async def _update_memory_row(
         self,
@@ -202,25 +216,30 @@ class MemoryService:
             except Exception:
                 self.client = None
 
+        metadata = dict(metadata or {})
+        sanitized_content = redact_pii(content or "", source="memory.create", field="content")
+        if sanitized_content != (content or ""):
+            metadata["pii_redacted"] = True
         memory = await self._persist_memory_row(
-            content=content,
+            content=sanitized_content,
             memory_type=memory_type,
-            metadata=metadata or {},
+            metadata=metadata,
             embedding_id="",
         )
 
         if self.client is not None:
             try:
-                vector = await self._embed_text(content)
+                await self._ensure_embeddings()
+                vector = await self._embed_text(sanitized_content)
                 created_at = (
                     memory.created_at.isoformat()
                     if hasattr(memory.created_at, "isoformat")
                     else memory.created_at
                 )
                 payload = self._build_payload(
-                    content=content,
+                    content=sanitized_content,
                     memory_type=memory_type,
-                    metadata=metadata or {},
+                    metadata=metadata,
                     created_at=created_at,
                 )
 
@@ -258,9 +277,15 @@ class MemoryService:
         if not memory:
             raise ValueError("Memory not found")
 
-        updated_content = content if content is not None else memory.content
+        updated_content = redact_pii(
+            content if content is not None else memory.content or "",
+            source="memory.update",
+            field="content",
+        )
         updated_type = memory_type if memory_type is not None else memory.memory_type
-        updated_metadata = metadata if metadata is not None else memory.memory_metadata
+        updated_metadata = dict(metadata if metadata is not None else (memory.memory_metadata or {}))
+        if updated_content != (content if content is not None else memory.content or ""):
+            updated_metadata["pii_redacted"] = True
 
         updated_memory = await self._update_memory_row(
             memory_id,
@@ -271,6 +296,7 @@ class MemoryService:
 
         if self.client is not None and PointStruct is not None:
             try:
+                await self._ensure_embeddings()
                 vector = await self._embed_text(updated_content)
                 payload = {
                     "memory_type": updated_type,
@@ -306,6 +332,50 @@ class MemoryService:
             return 1.0
         return 0.0
 
+    def _search_variants(
+        self,
+        query: str,
+        rewritten_query: str,
+        memory_type: Optional[str],
+        metadata_filter: Optional[Dict[str, Any]],
+    ) -> List[str]:
+        """
+        Build a small set of complementary query variants.
+
+        The raw query keeps precision high, while the rewritten query and
+        metadata-enriched variant improve recall when the user uses short or
+        ambiguous prompts.
+        """
+        variants = [rewritten_query]
+        raw_query = (query or "").strip()
+        if raw_query and raw_query != rewritten_query:
+            variants.append(raw_query)
+
+        domain_terms = []
+        if memory_type:
+            domain_terms.append(memory_type.replace("_", " "))
+
+        if metadata_filter:
+            for value in metadata_filter.values():
+                if isinstance(value, str):
+                    domain_terms.extend(token for token in tokenize(value) if token)
+                elif isinstance(value, (list, tuple, set)):
+                    for item in value:
+                        domain_terms.extend(token for token in tokenize(str(item)) if token)
+
+        if domain_terms:
+            variants.append(" ".join(dict.fromkeys([rewritten_query, *domain_terms])))
+
+        deduped: List[str] = []
+        seen = set()
+        for variant in variants:
+            normalized = normalize_text(variant)
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(variant)
+        return deduped
+
     async def search_memory(
         self,
         query: str,
@@ -326,13 +396,16 @@ class MemoryService:
         )
         allowed_memory_types = candidate_memory_types(query, memory_type=memory_type)
         allowed_memory_types_set = {normalize_text(item) for item in allowed_memory_types if item}
+        allowed_memory_types_set.add("general")
         search_terms = tokenize(rewritten_query)
         search_text = normalize_text(rewritten_query)
-        search_limit = max(k * 6, 30)
+        search_limit = max(k * getattr(settings, "rag_search_multiplier", 6), 30)
+        query_variants = self._search_variants(query, rewritten_query, memory_type, metadata_filter)
         candidates: Dict[str, Dict[str, Any]] = {}
 
         if self.client is not None:
             try:
+                query_vector = await self._embed_text(rewritten_query)
                 query_filter = None
 
                 if (
@@ -340,7 +413,6 @@ class MemoryService:
                     and FieldCondition is not None
                     and MatchValue is not None
                 ):
-                    query_vector = await self._embed_text(rewritten_query)
                     filter_conditions = []
                     if memory_type:
                         filter_conditions.append(
@@ -357,54 +429,146 @@ class MemoryService:
                                 FieldCondition(
                                     key=key,
                                     match=MatchValue(value=value),
+                                )
                             )
-                        )
                     query_filter = Filter(must=filter_conditions) if filter_conditions else None
-                else:
-                    query_vector = []
 
-                results = await asyncio.to_thread(
-                    self.client.search,
-                    collection_name=self.collection_name,
-                    query_vector=query_vector,
-                    query_filter=query_filter,
-                    limit=search_limit,
-                    with_payload=True,
-                    with_vectors=False,
-                )
+                search_vectors = []
+                if query_vector:
+                    search_vectors.append(query_vector)
 
-                for result in results:
-                    candidate = self._result_to_candidate(result, rewritten_query, memory_type)
-                    if self._accept_candidate(candidate, allowed_memory_types_set, metadata_filter):
-                        candidates[self._candidate_key(candidate)] = candidate
+                for variant in query_variants:
+                    if variant == rewritten_query:
+                        continue
+                    try:
+                        variant_vector = await self._embed_text(variant)
+                    except Exception:
+                        continue
+                    if variant_vector:
+                        search_vectors.append(variant_vector)
+
+                seen_vectors: set[tuple[float, ...]] = set()
+                if not search_vectors:
+                    raise RuntimeError("No searchable vectors were generated")
+
+                for vector in search_vectors:
+                    vector_key = tuple(round(float(value), 6) for value in vector[:16]) if vector else ()
+                    if vector_key in seen_vectors:
+                        continue
+                    seen_vectors.add(vector_key)
+
+                    results = await asyncio.to_thread(
+                        self.client.search,
+                        collection_name=self.collection_name,
+                        query_vector=vector,
+                        query_filter=query_filter,
+                        limit=search_limit,
+                        with_payload=True,
+                        with_vectors=False,
+                    )
+
+                    for result in results:
+                        candidate = self._result_to_candidate(result, rewritten_query, memory_type)
+                        if self._accept_candidate(candidate, allowed_memory_types_set, metadata_filter):
+                            key = self._candidate_key(candidate)
+                            existing = candidates.get(key)
+                            if existing is None or float(candidate.get("score", 0.0) or 0.0) > float(existing.get("score", 0.0) or 0.0):
+                                candidates[key] = candidate
             except Exception:
                 pass
 
-        memories = []
-        try:
-            async with AsyncSessionLocal() as db:
-                stmt = select(Memory)
-                if memory_type:
-                    stmt = stmt.where(Memory.memory_type == memory_type)
-                stmt = stmt.order_by(desc(Memory.created_at)).limit(max(k * 12, 40))
-                result = await db.execute(stmt)
-                memories = result.scalars().all()
-        except Exception:
-            memories = []
+        memories = await self._load_recent_memories(memory_type=memory_type, limit=max(k * 12, 40))
 
         for memory in memories:
             candidate = self._memory_to_candidate(memory, rewritten_query, memory_type)
             if self._accept_candidate(candidate, allowed_memory_types_set, metadata_filter):
-                candidates[self._candidate_key(candidate)] = candidate
+                key = self._candidate_key(candidate)
+                existing = candidates.get(key)
+                if existing is None or float(candidate.get("rerank_score", 0.0) or 0.0) > float(existing.get("rerank_score", 0.0) or 0.0):
+                    candidates[key] = candidate
+
+        candidate_list = list(candidates.values())
+        bm25_ranked = rank_candidates_by_bm25(
+            rewritten_query,
+            candidate_list,
+            metadata_filter=metadata_filter,
+        )
+        bm25_scores = {str(candidate.get("id")): candidate.get("bm25_score", 0.0) for candidate in bm25_ranked}
+
+        dense_ranked = sorted(
+            (
+                candidate
+                for candidate in candidate_list
+                if float(candidate.get("vector_score", 0.0) or 0.0) > 0.0
+            ),
+            key=lambda item: float(item.get("vector_score", 0.0) or 0.0),
+            reverse=True,
+        )
+        dense_ranking = [str(candidate.get("id")) for candidate in dense_ranked if candidate.get("id")]
+        bm25_ranking = [str(candidate.get("id")) for candidate in bm25_ranked if candidate.get("id")]
+        fused_scores = reciprocal_rank_fusion([dense_ranking, bm25_ranking], k=60)
+
+        enriched_candidates: List[Dict[str, Any]] = []
+        for candidate in candidate_list:
+            candidate_id = str(candidate.get("id")) if candidate.get("id") is not None else None
+            candidate = dict(candidate)
+            candidate["bm25_score"] = bm25_scores.get(candidate_id, candidate.get("bm25_score", 0.0))
+            candidate["rrf_score"] = fused_scores.get(candidate_id or "", 0.0)
+            enriched_candidates.append(candidate)
+
+        enriched_candidates.sort(
+            key=lambda item: (
+                float(item.get("rrf_score", 0.0) or 0.0),
+                float(item.get("bm25_score", 0.0) or 0.0),
+                float(item.get("vector_score", 0.0) or 0.0),
+            ),
+            reverse=True,
+        )
+
+        rerank_window = max(k * 3, 10)
+        reranked_window = cross_encoder_rerank_candidates(
+            rewritten_query,
+            enriched_candidates[:rerank_window],
+            top_n=getattr(settings, "cross_encoder_top_n", 10),
+        )
+        enriched_candidates = reranked_window + enriched_candidates[rerank_window:]
 
         ranked = rerank_candidates(
             rewritten_query,
-            list(candidates.values()),
+            enriched_candidates,
             limit=max(k * 2, k),
             metadata_filter=metadata_filter,
             token_budget=0,
         )
-        return ranked[:k]
+        if not ranked:
+            return []
+
+        expanded_ranked = ranked[: max(k * 2, k)]
+        final_ranked = []
+        for candidate in expanded_ranked:
+            candidate = dict(candidate)
+            candidate_text = normalize_text(candidate.get("content") or "")
+            query_terms = tokenize(rewritten_query)
+            overlap = len(set(tokenize(candidate_text)) & set(query_terms)) / max(1, len(set(query_terms) | set(tokenize(candidate_text))))
+            exact_phrase = 1.0 if search_text and search_text in candidate_text else 0.0
+            candidate["score"] = max(
+                float(candidate.get("score", 0.0) or 0.0),
+                float(candidate.get("rerank_score", 0.0) or 0.0),
+                0.15 * overlap + 0.10 * exact_phrase,
+            )
+            final_ranked.append(candidate)
+
+        final_ranked.sort(
+            key=lambda item: (
+                float(item.get("score", 0.0) or 0.0),
+                float(item.get("cross_encoder_score", 0.0) or 0.0),
+                float(item.get("rrf_score", 0.0) or 0.0),
+                float(item.get("bm25_score", 0.0) or 0.0),
+                float(item.get("vector_score", 0.0) or 0.0),
+            ),
+            reverse=True,
+        )
+        return final_ranked[:k]
 
     def _memory_to_candidate(
         self,
@@ -416,7 +580,10 @@ class MemoryService:
         candidate = self._serialize_memory(memory)
         candidate.update({
             "vector_score": 0.0,
-            "lexical_score": self._lexical_score(rewritten_query, memory.content or ""),
+            "lexical_score": self._lexical_score(
+                rewritten_query,
+                redact_pii(memory.content or "", source="memory.search", field="content"),
+            ),
             "recency_boost": self._recency_boost(memory.created_at.isoformat() if memory.created_at else None),
             "source": metadata.get("source") or metadata.get("type") or memory.memory_type,
             "filename": metadata.get("filename"),
@@ -426,6 +593,7 @@ class MemoryService:
             "chunk_count": metadata.get("chunk_count"),
             "chunk_type": metadata.get("chunk_type"),
             "title": metadata.get("title"),
+            "owner_family_member_id": metadata.get("owner_family_member_id"),
         })
         candidate["score"] = self._base_candidate_score(
             candidate,
@@ -445,12 +613,13 @@ class MemoryService:
         metadata = payload.get("metadata") or {}
         candidate = {
             "id": str(result.id),
-            "content": payload.get("content"),
+            "content": redact_pii(payload.get("content") or "", source="memory.search", field="content"),
             "memory_type": payload.get("memory_type"),
             "category": payload.get("memory_type"),
             "tags": payload.get("tags") or metadata.get("tags") or [],
             "importance": metadata.get("importance"),
             "metadata": metadata,
+            "owner_family_member_id": metadata.get("owner_family_member_id"),
             "source": payload.get("source") or metadata.get("source"),
             "filename": payload.get("filename") or metadata.get("filename"),
             "document_id": payload.get("document_id") or metadata.get("document_id"),
@@ -460,7 +629,10 @@ class MemoryService:
             "chunk_type": payload.get("chunk_type") or metadata.get("chunk_type"),
             "title": payload.get("title") or metadata.get("title"),
             "vector_score": float(result.score or 0.0),
-            "lexical_score": self._lexical_score(rewritten_query, payload.get("content") or ""),
+            "lexical_score": self._lexical_score(
+                rewritten_query,
+                redact_pii(payload.get("content") or "", source="memory.search", field="content"),
+            ),
             "recency_boost": self._recency_boost(payload.get("created_at")),
             "score": float(result.score or 0.0),
             "created_at": payload.get("created_at"),
@@ -489,6 +661,7 @@ class MemoryService:
         self,
         memory_type: Optional[str] = None,
         limit: int = 50,
+        metadata_filter: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         async with AsyncSessionLocal() as db:
             stmt = select(Memory)
@@ -498,7 +671,14 @@ class MemoryService:
             result = await db.execute(stmt)
             memories = result.scalars().all()
 
-        return [self._serialize_memory(memory) for memory in memories]
+        serialized = [self._serialize_memory(memory) for memory in memories]
+        if metadata_filter:
+            serialized = [
+                memory
+                for memory in serialized
+                if metadata_matches(memory.get("metadata") or {}, metadata_filter)
+            ]
+        return serialized
 
     async def delete_memory(self, memory_id: str) -> bool:
         async with AsyncSessionLocal() as db:
@@ -511,8 +691,8 @@ class MemoryService:
             await db.commit()
             return True
 
-    async def categories_summary(self) -> Dict[str, Any]:
-        memories = await self.list_memories(limit=10000)
+    async def categories_summary(self, metadata_filter: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        memories = await self.list_memories(limit=10000, metadata_filter=metadata_filter)
         categories: Dict[str, int] = {}
         for memory in memories:
             category = memory.get("memory_type") or "general"
@@ -558,6 +738,24 @@ class MemoryService:
         lexical = float(candidate.get("lexical_score", 0.0) or 0.0)
         type_bonus = 1.0 if requested_memory_type and candidate.get("memory_type") == requested_memory_type else 0.0
         return max(0.0, min(1.0, 0.35 * vector + 0.35 * lexical + 0.15 * term_score + 0.10 * recency + 0.05 * exact_match + 0.05 * type_bonus))
+
+    async def _load_recent_memories(
+        self,
+        *,
+        memory_type: Optional[str] = None,
+        limit: int = 40,
+    ) -> List[Memory]:
+        try:
+            async with AsyncSessionLocal() as db:
+                stmt = select(Memory)
+                if memory_type:
+                    stmt = stmt.where(Memory.memory_type == memory_type)
+                stmt = stmt.order_by(desc(Memory.created_at)).limit(limit)
+                # Keep the optional SQL fallback responsive if the database is slow or unavailable.
+                result = await asyncio.wait_for(db.execute(stmt), timeout=3.0)
+                return result.scalars().all()
+        except (asyncio.TimeoutError, Exception):
+            return []
 
 
 memory_service = MemoryService()

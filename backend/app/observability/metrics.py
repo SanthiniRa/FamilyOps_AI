@@ -32,6 +32,24 @@ COST_COUNTER = Counter(
     "LLM cost"
 )
 
+CACHE_HIT_COUNTER = Counter(
+    "familyops_cache_hits_total",
+    "Cache hits",
+    ["layer"]
+)
+
+RETRY_COUNTER = Counter(
+    "familyops_retries_total",
+    "Retry attempts",
+    ["operation"]
+)
+
+RATE_LIMIT_COUNTER = Counter(
+    "familyops_rate_limited_total",
+    "Rate limited requests",
+    ["route"]
+)
+
 LATENCY = Histogram(
     "familyops_request_seconds",
     "Request latency"

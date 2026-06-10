@@ -58,6 +58,37 @@ class FamilyMember(Base):
 
     tasks = relationship("Task", back_populates="assignee")
     reminders = relationship("Reminder", back_populates="member")
+    user_account = relationship("User", back_populates="family_member", uselist=False)
+
+
+# ============================================================
+# Users
+# ============================================================
+class UserRole(str, enum.Enum):
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
+    GUEST = "guest"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(255))
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.MEMBER)
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+
+    family_member_id = Column(String, ForeignKey("family_members.id"), unique=True)
+
+    last_login_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    family_member = relationship("FamilyMember", back_populates="user_account")
 
 
 # ============================================================

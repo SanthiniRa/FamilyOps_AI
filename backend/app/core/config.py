@@ -41,6 +41,50 @@ class Settings(BaseSettings):
     rag_memory_chunk_overlap: int = 10
     rag_search_multiplier: int = 6
     rag_context_token_budget: int = 650
+    cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    cross_encoder_top_n: int = 10
+    enable_cross_encoder_rerank: bool = False
+    enable_pii_redaction: bool = True
+    enable_strict_pii_redaction: bool = False
+    redaction_audit_log_path: str = ""
+
+    # Web search
+    web_search_max_results: int = 5
+    web_search_fetch_limit: int = 3
+    web_search_timeout_seconds: int = 12
+    web_search_provider: str = "duckduckgo"
+    web_search_tavily_api_key: str = ""
+    web_search_tavily_search_depth: str = "basic"
+    web_search_cache_ttl_seconds: int = 300
+    web_search_rate_limit_requests_per_minute: int = 20
+
+    # Weather
+    weather_timeout_seconds: int = 12
+    weather_forecast_days: int = 5
+    weather_default_country_code: str = "GB"
+    weather_cache_ttl_seconds: int = 900
+    weather_rate_limit_requests_per_minute: int = 30
+
+    # Event search
+    event_search_timeout_seconds: int = 12
+    event_search_provider: str = "ticketmaster"
+    event_search_country_code: str = "GB"
+    ticketmaster_api_key: str = ""
+    event_search_cache_ttl_seconds: int = 600
+    event_search_rate_limit_requests_per_minute: int = 20
+
+    # Recipe search
+    recipe_search_timeout_seconds: int = 12
+    recipe_search_provider: str = "themealdb"
+    recipe_search_cache_ttl_seconds: int = 1800
+    recipe_search_rate_limit_requests_per_minute: int = 30
+
+    # Resilience
+    external_api_retry_attempts: int = 3
+    external_api_retry_base_delay_seconds: float = 0.25
+    external_api_retry_max_delay_seconds: float = 2.0
+    external_rate_limit_window_seconds: int = 60
+    enable_shared_resilience_redis: bool = False
 
     # Redis
     redis_url: str = "redis://localhost:6379"
@@ -64,6 +108,9 @@ class Settings(BaseSettings):
     email_imap_port: int = 993
     email_address: str = ""
     email_password: str = ""
+    important_email_keywords: str = "urgent,action required,reply required,invoice,payment,deadline,permission slip,form,rsvp,conference,pickup,drop off"
+    important_email_senders: str = ""
+    important_email_sender_domains: str = ""
 
     # Google Calendar
     google_client_id: str = ""

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sparkles, UtensilsCrossed, ChevronLeft, ChevronRight, Salad } from "lucide-react";
 import { formatDate, cn } from "@/lib/utils";
-import { startOfWeek, addWeeks, subWeeks, addDays, parseISO } from "date-fns";
+import { startOfWeek, addWeeks, subWeeks, addDays, format } from "date-fns";
 
 const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
 const MEALS = ["breakfast","lunch","dinner"];
@@ -28,22 +28,27 @@ function normalizeWeek(date: Date) {
   return startOfWeek(date, { weekStartsOn: 1 });
 }
 
+function getWeekKey(date: Date) {
+  return format(normalizeWeek(date), "yyyy-MM-dd");
+}
+
 export default function MealsPage() {
   const qc = useQueryClient();
 
   const [weekStart, setWeekStart] = useState(() =>
     normalizeWeek(new Date())
   );
+  const weekKey = useMemo(() => getWeekKey(weekStart), [weekStart]);
 
   const { data: plans = [] } = useQuery({
-    queryKey: ["meal-plans"],
-    queryFn: () => mealsApi.listPlans().then((r) => r.data),
+    queryKey: ["meal-plans", weekKey],
+    queryFn: () => mealsApi.listPlans({ week_start: weekKey }).then((r) => r.data),
   });
 
   const generatePlan = useMutation({
     mutationFn: () =>
       mealsApi.generatePlan({
-        week_start: weekStart.toISOString(),
+        week_start: weekKey,
         preferences: {},
       }),
     onSuccess: async () => {
@@ -52,10 +57,13 @@ export default function MealsPage() {
     }
   });
 
-  // ✅ FIXED MATCHING LOGIC
   const currentPlan = useMemo(() => {
-    return plans[0]; // TEMP: always show latest plan
-  }, [plans]);
+    return plans.find((plan) => plan.week_start?.slice(0, 10) === weekKey);
+  }, [plans, weekKey]);
+
+  const weekStatus = currentPlan
+    ? { label: "Plan saved for this week", variant: "success" as const }
+    : { label: "No plan saved yet", variant: "warning" as const };
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -86,6 +94,11 @@ export default function MealsPage() {
             <p className="font-semibold">
               {formatDate(weekStart)} — {formatDate(addDays(weekStart, 6))}
             </p>
+
+            <Badge variant={weekStatus.variant} className="mt-1 gap-1">
+              <Salad className="h-3 w-3" />
+              {weekStatus.label}
+            </Badge>
 
             {currentPlan?.generated_by_ai && (
               <Badge variant="secondary" className="mt-1">
@@ -127,17 +140,28 @@ export default function MealsPage() {
           ))}
         </div>
       ) : (
-        <Card>
+        <Card className="border-dashed bg-gradient-to-br from-muted/60 via-background to-amber-50/50">
           <CardContent className="py-16 text-center">
-            <UtensilsCrossed className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-            <p className="text-muted-foreground mb-4">
-              No meal plan for this week yet.
-            </p>
+            <div className="mx-auto flex max-w-sm flex-col items-center">
+              <div className="mb-4 rounded-full border border-amber-200 bg-white/80 p-4 shadow-sm">
+                <UtensilsCrossed className="h-10 w-10 text-amber-600" />
+              </div>
 
-            <Button onClick={() => generatePlan.mutate()} disabled={generatePlan.isPending}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate Plan
-            </Button>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+                Week not planned
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                No meal plan for this week yet.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Generate a plan for this week to fill in breakfast, lunch, and dinner for every day.
+              </p>
+
+              <Button onClick={() => generatePlan.mutate()} disabled={generatePlan.isPending} className="mt-6">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate Plan
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -1,19 +1,35 @@
 {
   "dataset_name": "familyops_synthetic_eval_v1",
+  "evaluation_version": "2026-06-10.1",
+  "prompt_versions": {
+    "orchestrator.system": "1.0.0",
+    "orchestrator.intent": "1.0.0",
+    "email.action_items": "1.0.0",
+    "email.extract": "1.0.0",
+    "grocery.suggestions": "1.0.0",
+    "meal.recipe_selection": "1.0.0"
+  },
   "total_cases": 40,
   "pass_threshold": 0.8,
-  "final_score": 0.8115808537475822,
-  "rag_quality": 0.6031456064720994,
+  "final_score": 0.9291878704108407,
+  "rag_quality": 0.6805089756125167,
   "rag_metrics": {
-    "context_precision": 0.525,
-    "context_recall": 0.55,
-    "faithfulness": 1.0,
-    "answer_relevance": 0.3375824258883974
+    "context_precision": 0.5666666666666667,
+    "context_recall": 0.8,
+    "faithfulness": 0.925,
+    "answer_relevance": 0.4303692357834002
   },
-  "answer_quality": 0.643177808518229,
-  "hallucination_penalty": 1.0,
+  "answer_quality": 0.6721885102746642,
+  "task_specific_score": 0.6376455149860054,
+  "error_handling_score": 1.0,
+  "hallucination_penalty": 0.9875,
   "tool_selection_accuracy": 1.0,
   "routing_accuracy": 1.0,
+  "estimated_tokens": 56.675,
+  "estimated_cost_units": 0.056675,
+  "latency_ms": 4.745530500167661,
+  "retrieval_latency_ms": 4.364772500230174,
+  "generation_latency_ms": 0.38005069986866147,
   "passed": true,
   "cases": [
     {
@@ -28,30 +44,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Lisa emailed: dentist appointment on Friday June 12 at 3:00 PM.",
-        "School email confirms the field trip on Thursday June 18 at 8:00 AM.",
+        "Location: 124 Oak Street, Suite 3.",
         "Vet appointment is Monday June 15 at 2:00 PM."
       ],
       "reference_answer": "I added the dentist appointment for Friday June 12 at 3:00 PM at 124 Oak Street, Suite 3 to the calendar.",
-      "generated_answer": "I added dentist appointment for Friday June 12 at 3:00 PM at 3:00 PM to the calendar.",
+      "generated_answer": "From the email, I added dentist appointment for Friday June 12 at 3:00 PM at 3:00 PM to your calendar.",
       "rag_metrics": {
         "context_precision": 1.0,
-        "context_recall": 0.5,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.672077922077922,
-        "rag_quality": 0.7930194805194806
+        "answer_relevance": 0.7326895902025435,
+        "rag_quality": 0.9331723975506359
       },
       "answer_metrics": {
-        "correctness": 0.8105263157894738,
+        "correctness": 0.7080588493631972,
         "completeness": 0.7894736842105263,
         "coherence": 1.0,
-        "usefulness": 0.8180194805194805,
-        "answer_quality": 0.8545048701298701
+        "usefulness": 0.8075555309440667,
+        "answer_quality": 0.8262720161294476
       },
+      "task_specific_score": 0.7640096618357488,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.9118810876623378
+      "estimated_tokens": 68,
+      "estimated_cost_units": 0.068,
+      "latency_ms": 12.94214299923624,
+      "retrieval_latency_ms": 9.895228999084793,
+      "generation_latency_ms": 3.044152001166367,
+      "error_message": null,
+      "final_score": 1.0
     },
     {
       "case_id": "email_calendar_02",
@@ -65,30 +89,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Jordan wrote that the PTA meeting is Tuesday June 16 at 6:00 PM.",
-        "Orthodontist visit is Tuesday June 16 at 11:00 AM.",
-        "The meeting will be in the school library."
+        "The meeting will be in the school library.",
+        "Location: 124 Oak Street, Suite 3."
       ],
       "reference_answer": "I scheduled the PTA meeting for Tuesday June 16 at 6:00 PM in the school library.",
-      "generated_answer": "I added PTA meeting for Tuesday at 6 at 6:00 PM to the calendar.",
+      "generated_answer": "From the email, I added PTA meeting for Tuesday at 6 at 6:00 PM to your calendar.",
       "rag_metrics": {
-        "context_precision": 1.0,
+        "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.43796992481203006,
-        "rag_quality": 0.8594924812030075
+        "answer_relevance": 0.44224337535374325,
+        "rag_quality": 0.7772275105051025
       },
       "answer_metrics": {
-        "correctness": 0.6286751361161524,
+        "correctness": 0.5359147025813692,
         "completeness": 0.625,
         "coherence": 1.0,
-        "usefulness": 0.6729112652320456,
-        "answer_quality": 0.7316466003370495
+        "usefulness": 0.6507895194837781,
+        "answer_quality": 0.7029260555162868
       },
+      "task_specific_score": 0.6820987654320987,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8977847703850144
+      "estimated_tokens": 63,
+      "estimated_cost_units": 0.063,
+      "latency_ms": 6.459111000367557,
+      "retrieval_latency_ms": 6.414483999833465,
+      "generation_latency_ms": 0.043480000385898165,
+      "error_message": null,
+      "final_score": 0.9617569814162308
     },
     {
       "case_id": "email_calendar_03",
@@ -102,30 +134,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Email says soccer carpool starts Wednesday June 17 at 7:30 AM.",
-        "Payment reminder should be set for the morning.",
-        "School email confirms the field trip on Thursday June 18 at 8:00 AM."
+        "The meeting will be in the school library.",
+        "Pickup is at the west entrance."
       ],
       "reference_answer": "I added the soccer carpool reminder for Wednesday June 17 at 7:30 AM at the west entrance.",
-      "generated_answer": "I added soccer carpool reminder for Wednesday June 17 at 7:30 AM at 7:30 AM to the calendar.",
+      "generated_answer": "From the email, I added soccer carpool reminder for Wednesday June 17 at 7:30 AM at 7:30 AM to your calendar.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
-        "context_recall": 0.5,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.42194805194805196,
-        "rag_quality": 0.6471536796536796
+        "answer_relevance": 0.44044384057971014,
+        "rag_quality": 0.7767776268115942
       },
       "answer_metrics": {
-        "correctness": 0.8064713064713065,
+        "correctness": 0.7051926298157454,
         "completeness": 0.875,
         "coherence": 1.0,
-        "usefulness": 0.7758548396048396,
-        "answer_quality": 0.8643315365190365
+        "usefulness": 0.7551591175988639,
+        "answer_quality": 0.8338379368536524
       },
+      "task_specific_score": 0.7706030150753769,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8778713040431791
+      "estimated_tokens": 63,
+      "estimated_cost_units": 0.063,
+      "latency_ms": 4.275003000657307,
+      "retrieval_latency_ms": 4.235161000906373,
+      "generation_latency_ms": 0.03912899956048932,
+      "error_message": null,
+      "final_score": 0.9967407579343248
     },
     {
       "case_id": "email_calendar_04",
@@ -139,30 +179,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "School email confirms the field trip on Thursday June 18 at 8:00 AM.",
-        "Parent-teacher conference is Thursday June 18 at 7:00 PM.",
-        "Email says soccer carpool starts Wednesday June 17 at 7:30 AM."
+        "Email says soccer carpool starts Wednesday June 17 at 7:30 AM.",
+        "Vet appointment is Monday June 15 at 2:00 PM."
       ],
       "reference_answer": "I created a calendar event for the field trip on Thursday June 18 at 8:00 AM at the front gate.",
-      "generated_answer": "I added a calendar event for Thursday June 18 at 8:00 AM at 8:00 AM to the calendar.",
+      "generated_answer": "From the email, I added a calendar event for Thursday June 18 at 8:00 AM at 8:00 AM to your calendar.",
       "rag_metrics": {
         "context_precision": 1.0,
         "context_recall": 0.5,
         "faithfulness": 1.0,
-        "answer_relevance": 0.4876277568585261,
-        "rag_quality": 0.7469069392146315
+        "answer_relevance": 0.5780738662926601,
+        "rag_quality": 0.769518466573165
       },
       "answer_metrics": {
-        "correctness": 0.6726523011439213,
+        "correctness": 0.5922619047619048,
         "completeness": 0.6842105263157895,
         "coherence": 1.0,
-        "usefulness": 0.7111226460795592,
-        "answer_quality": 0.7669963683848176
+        "usefulness": 0.7136365743425885,
+        "answer_quality": 0.7475272513550707
       },
+      "task_specific_score": 0.7,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8784758268998623
+      "estimated_tokens": 77,
+      "estimated_cost_units": 0.077,
+      "latency_ms": 4.750783000417869,
+      "retrieval_latency_ms": 4.715054999905988,
+      "generation_latency_ms": 0.03517100049066357,
+      "error_message": null,
+      "final_score": 0.9704325664043892
     },
     {
       "case_id": "email_calendar_05",
@@ -176,30 +224,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Vet appointment is Monday June 15 at 2:00 PM.",
-        "Lisa emailed: dentist appointment on Friday June 12 at 3:00 PM.",
-        "Jordan wrote that the PTA meeting is Tuesday June 16 at 6:00 PM."
+        "Students should meet at the front gate.",
+        "Clinic address: 88 Pine Avenue."
       ],
       "reference_answer": "I added the vet appointment for Monday June 15 at 2:00 PM at 88 Pine Avenue.",
-      "generated_answer": "I added vet appointment mentioned for Monday at 2 at 2:00 PM to the calendar.",
+      "generated_answer": "From the email, I added vet appointment mentioned for Monday at 2 at 2:00 PM to your calendar.",
       "rag_metrics": {
-        "context_precision": 1.0,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.6143790849673203,
-        "rag_quality": 0.7785947712418301
+        "answer_relevance": 0.5894736842105264,
+        "rag_quality": 0.8140350877192982
       },
       "answer_metrics": {
-        "correctness": 0.6554867561059512,
+        "correctness": 0.5735294117647058,
         "completeness": 0.6875,
         "coherence": 1.0,
-        "usefulness": 0.7393414602683179,
-        "answer_quality": 0.7705820540935673
+        "usefulness": 0.712625773993808,
+        "answer_quality": 0.7434137964396285
       },
+      "task_specific_score": 0.7029411764705882,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8872942063338494
+      "estimated_tokens": 55,
+      "estimated_cost_units": 0.055,
+      "latency_ms": 4.154141999606509,
+      "retrieval_latency_ms": 4.124078999666381,
+      "generation_latency_ms": 0.02943900108220987,
+      "error_message": null,
+      "final_score": 0.9796435043163515
     },
     {
       "case_id": "email_calendar_06",
@@ -213,30 +269,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Parent-teacher conference is Thursday June 18 at 7:00 PM.",
-        "School email confirms the field trip on Thursday June 18 at 8:00 AM.",
-        "Payment reminder should be set for the morning."
+        "Conference room B is reserved.",
+        "Clinic address: 88 Pine Avenue."
       ],
       "reference_answer": "I created a calendar event for the parent-teacher conference on Thursday June 18 at 7:00 PM in Conference Room B.",
-      "generated_answer": "I added parent-teacher conference for Thursday June 18 at 7:00 PM at 7:00 PM to the calendar.",
+      "generated_answer": "From the email, I added parent-teacher conference for Thursday June 18 at 7:00 PM at 7:00 PM to your calendar.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
-        "context_recall": 0.5,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3954171562867215,
-        "rag_quality": 0.640520955738347
+        "answer_relevance": 0.4251237623762376,
+        "rag_quality": 0.7729476072607261
       },
       "answer_metrics": {
-        "correctness": 0.6295905445335586,
+        "correctness": 0.5741635046567781,
         "completeness": 0.6666666666666666,
         "coherence": 1.0,
-        "usefulness": 0.6729185918717366,
-        "answer_quality": 0.7422939507679904
+        "usefulness": 0.6664884834249206,
+        "answer_quality": 0.7268296636870913
       },
+      "task_specific_score": 0.7110778443113772,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8457037266265843
+      "estimated_tokens": 59,
+      "estimated_cost_units": 0.059,
+      "latency_ms": 4.576313000143273,
+      "retrieval_latency_ms": 4.5395650013233535,
+      "generation_latency_ms": 0.03622799886215944,
+      "error_message": null,
+      "final_score": 0.9687649327519485
     },
     {
       "case_id": "email_calendar_07",
@@ -250,30 +314,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Invoice is due Friday June 19.",
-        "Lisa emailed: dentist appointment on Friday June 12 at 3:00 PM.",
-        "School email confirms the field trip on Thursday June 18 at 8:00 AM."
+        "Conference room B is reserved.",
+        "Payment reminder should be set for the morning."
       ],
       "reference_answer": "I added the due date to the calendar for Friday June 19 in the morning.",
-      "generated_answer": "I added due date for Friday June 19 at 3:00 PM to the calendar.",
+      "generated_answer": "From the email, I added due date for Friday June 19 to your calendar.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3814814814814815,
-        "rag_quality": 0.5537037037037037
+        "answer_relevance": 0.5620567375886525,
+        "rag_quality": 0.8071808510638298
       },
       "answer_metrics": {
-        "correctness": 0.6444249341527656,
+        "correctness": 0.6366071428571429,
         "completeness": 0.8461538461538461,
         "coherence": 1.0,
-        "usefulness": 0.7180150654470233,
-        "answer_quality": 0.8021484614384088
+        "usefulness": 0.7612044316499104,
+        "answer_quality": 0.8109913551652248
       },
+      "task_specific_score": 0.73125,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8389630412855282
+      "estimated_tokens": 47,
+      "estimated_cost_units": 0.047,
+      "latency_ms": 4.522664999967674,
+      "retrieval_latency_ms": 4.107029999431688,
+      "generation_latency_ms": 0.41484900066279806,
+      "error_message": null,
+      "final_score": 0.9949121412770614
     },
     {
       "case_id": "email_calendar_08",
@@ -287,30 +359,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Piano recital is Saturday June 20 at 4:00 PM.",
-        "Birthday dinner is Saturday June 20 at 7:30 PM.",
-        "School email confirms the field trip on Thursday June 18 at 8:00 AM."
+        "Payment reminder should be set for the morning.",
+        "Venue: downtown arts center."
       ],
       "reference_answer": "I added the piano recital for Saturday June 20 at 4:00 PM at the downtown arts center.",
-      "generated_answer": "I added piano recital for Saturday at 4 at 4:00 PM to the calendar.",
+      "generated_answer": "From the email, I added piano recital for Saturday at 4 at 4:00 PM to your calendar.",
       "rag_metrics": {
-        "context_precision": 1.0,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.5961879432624113,
-        "rag_quality": 0.7740469858156028
+        "answer_relevance": 0.6061057334326136,
+        "rag_quality": 0.81819310002482
       },
       "answer_metrics": {
-        "correctness": 0.6911764705882353,
+        "correctness": 0.6030812324929973,
         "completeness": 0.6875,
         "coherence": 1.0,
-        "usefulness": 0.7437161034626616,
-        "answer_quality": 0.7805981435127243
+        "usefulness": 0.7241717414814027,
+        "answer_quality": 0.7536882434936
       },
+      "task_specific_score": 0.7276470588235293,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8886612823320819
+      "estimated_tokens": 55,
+      "estimated_cost_units": 0.055,
+      "latency_ms": 4.147821999140433,
+      "retrieval_latency_ms": 4.115658000955591,
+      "generation_latency_ms": 0.03177700091328006,
+      "error_message": null,
+      "final_score": 0.985000702923553
     },
     {
       "case_id": "email_calendar_09",
@@ -324,30 +404,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Orthodontist visit is Tuesday June 16 at 11:00 AM.",
-        "Jordan wrote that the PTA meeting is Tuesday June 16 at 6:00 PM.",
-        "School email confirms the field trip on Thursday June 18 at 8:00 AM."
+        "Office is on Maple Road.",
+        "Venue: downtown arts center."
       ],
       "reference_answer": "I scheduled the orthodontist visit for Tuesday June 16 at 11:00 AM on Maple Road.",
-      "generated_answer": "I added orthodontist visit for Tuesday at 11 at 11:00 AM to the calendar.",
+      "generated_answer": "From the email, I added orthodontist visit for Tuesday at 11 at 11:00 AM to your calendar.",
       "rag_metrics": {
-        "context_precision": 1.0,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.5325914149443561,
-        "rag_quality": 0.7581478537360891
+        "answer_relevance": 0.5505050505050505,
+        "rag_quality": 0.8042929292929293
       },
       "answer_metrics": {
-        "correctness": 0.6397812713602187,
+        "correctness": 0.5664540138224349,
         "completeness": 0.625,
         "coherence": 1.0,
-        "usefulness": 0.6993431715761437,
-        "answer_quality": 0.7410311107340906
+        "usefulness": 0.6854897660818713,
+        "answer_quality": 0.7192359449760766
       },
+      "task_specific_score": 0.7248538011695906,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.874794741117545
+      "estimated_tokens": 50,
+      "estimated_cost_units": 0.05,
+      "latency_ms": 4.36071100011759,
+      "retrieval_latency_ms": 4.32585199996538,
+      "generation_latency_ms": 0.03431100049056113,
+      "error_message": null,
+      "final_score": 0.9752343916395079
     },
     {
       "case_id": "email_calendar_10",
@@ -361,30 +449,38 @@
       "predicted_agent": "calendar_agent",
       "retrieved_contexts": [
         "Birthday dinner is Saturday June 20 at 7:30 PM.",
-        "Piano recital is Saturday June 20 at 4:00 PM.",
-        "Payment reminder should be set for the morning."
+        "Restaurant reservation is under the family name.",
+        "Office is on Maple Road."
       ],
       "reference_answer": "I added the birthday dinner for Saturday June 20 at 7:30 PM with the family reservation note.",
-      "generated_answer": "I added birthday dinner email for Saturday June 20 at 7:30 PM at 7:30 PM to the calendar.",
+      "generated_answer": "From the email, I added birthday dinner email for Saturday June 20 at 7:30 PM at 7:30 PM to your calendar.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
-        "context_recall": 0.5,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3957772996234534,
-        "rag_quality": 0.64061099157253
+        "answer_relevance": 0.3823924731182796,
+        "rag_quality": 0.7622647849462365
       },
       "answer_metrics": {
-        "correctness": 0.6931318681318681,
+        "correctness": 0.607012334399269,
         "completeness": 0.7647058823529411,
         "coherence": 1.0,
-        "usefulness": 0.7134037625270657,
-        "answer_quality": 0.7928103782529687
+        "usefulness": 0.6885276724676225,
+        "answer_quality": 0.7650614723049581
       },
+      "task_specific_score": 0.686180904522613,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8583553424563748
+      "estimated_tokens": 58,
+      "estimated_cost_units": 0.058,
+      "latency_ms": 4.53324599948246,
+      "retrieval_latency_ms": 4.500568000366911,
+      "generation_latency_ms": 0.032248999559669755,
+      "error_message": null,
+      "final_score": 0.97182334354001
     },
     {
       "case_id": "meal_planning_01",
@@ -399,29 +495,37 @@
       "retrieved_contexts": [
         "Family preference: lactose-free dinners.",
         "Pantry items available: chicken breast, broccoli, rice.",
-        "Vegetarian household preference is enabled for Mondays and Wednesdays."
+        "Family preference: peanut-free meals."
       ],
       "reference_answer": "I created a dinner plan that uses chicken breast and broccoli and keeps the meals lactose-free.",
-      "generated_answer": "I created a meal plan around Family preference: lactose-free dinners; Pantry items available: chicken breast, broccoli, rice.",
+      "generated_answer": "I planned dinners this week for a lactose-free family around Family preference: lactose-free dinners; Pantry items available: chicken breast, broccoli, rice.",
       "rag_metrics": {
-        "context_precision": 0.6666666666666666,
+        "context_precision": 1.0,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.38796715267303505,
-        "rag_quality": 0.7636584548349254
+        "answer_relevance": 0.5045606567345697,
+        "rag_quality": 0.8761401641836424
       },
       "answer_metrics": {
-        "correctness": 0.4163636363636364,
-        "completeness": 0.5625,
+        "correctness": 0.3115079365079365,
+        "completeness": 0.4375,
         "coherence": 1.0,
-        "usefulness": 0.5917076972591678,
-        "answer_quality": 0.642642833405701
+        "usefulness": 0.5633921483106266,
+        "answer_quality": 0.5781000212046408
       },
+      "task_specific_score": 0.6632075471698113,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8515753220601567
+      "estimated_tokens": 57,
+      "estimated_cost_units": 0.057,
+      "latency_ms": 10.951064001346822,
+      "retrieval_latency_ms": 8.360006999282632,
+      "generation_latency_ms": 2.5897949999489356,
+      "error_message": null,
+      "final_score": 0.9548259593446126
     },
     {
       "case_id": "meal_planning_02",
@@ -434,31 +538,39 @@
       "expected_agent": "meal_agent",
       "predicted_agent": "meal_agent",
       "retrieved_contexts": [
-        "Simple family dinners are preferred on Tuesdays.",
-        "Fridge inventory includes leftover chicken and roasted vegetables.",
-        "One dinner should include fish once per week."
+        "One dinner should include fish once per week.",
+        "Family likes mild flavors for weeknight dinners.",
+        "Fridge inventory includes leftover chicken and roasted vegetables."
       ],
       "reference_answer": "I put together five kid-friendly peanut-free dinners that are quick enough for busy weeknights.",
-      "generated_answer": "I created a meal plan around Simple family dinners are preferred on Tuesdays; Fridge inventory includes leftover chicken and roasted vegetables.",
+      "generated_answer": "I planned give me five kid-friendly dinners that avoid peanuts and fit a busy week around One dinner should include fish once per week; Family likes mild flavors for weeknight dinners.",
       "rag_metrics": {
-        "context_precision": 0.6666666666666666,
+        "context_precision": 0.3333333333333333,
         "context_recall": 0.5,
         "faithfulness": 1.0,
-        "answer_relevance": 0.23120679723502305,
-        "rag_quality": 0.5994683659754224
+        "answer_relevance": 0.5173800259403372,
+        "rag_quality": 0.5876783398184177
       },
       "answer_metrics": {
-        "correctness": 0.16545655919271474,
-        "completeness": 0.1875,
+        "correctness": 0.31673269194491604,
+        "completeness": 0.5,
         "coherence": 1.0,
-        "usefulness": 0.39604083910693444,
-        "answer_quality": 0.4372493495749123
+        "usefulness": 0.5835281794713133,
+        "answer_quality": 0.6000652178540573
       },
+      "task_specific_score": 0.5960573476702509,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7591794288875837
+      "estimated_tokens": 69,
+      "estimated_cost_units": 0.069,
+      "latency_ms": 5.293723999784561,
+      "retrieval_latency_ms": 4.590612999891164,
+      "generation_latency_ms": 0.7023119997029426,
+      "error_message": null,
+      "final_score": 0.8944676889765241
     },
     {
       "case_id": "meal_planning_03",
@@ -473,29 +585,37 @@
       "retrieved_contexts": [
         "Pantry items available: sweet potatoes, spinach, onions.",
         "Vegetarian household preference is enabled for Mondays and Wednesdays.",
-        "The household has two adults and two kids."
+        "Family dietary restriction: gluten-free."
       ],
       "reference_answer": "I built a vegetarian meal plan that uses sweet potatoes and spinach from the pantry.",
-      "generated_answer": "I created a meal plan around Pantry items available: sweet potatoes, spinach, onions; Vegetarian household preference is enabled for Mondays and Wednesdays.",
+      "generated_answer": "I planned a vegetarian meal plan and use the sweet potatoes and spinach in the pantry around Pantry items available: sweet potatoes, spinach, onions; Vegetarian household preference is enabled for Mondays and Wednesdays.",
       "rag_metrics": {
-        "context_precision": 1.0,
+        "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3957659987071752,
-        "rag_quality": 0.8489414996767938
+        "answer_relevance": 0.25394803871625066,
+        "rag_quality": 0.7301536763457294
       },
       "answer_metrics": {
-        "correctness": 0.40185185185185185,
-        "completeness": 0.6666666666666666,
+        "correctness": 0.426497277676951,
+        "completeness": 0.7333333333333333,
         "coherence": 1.0,
-        "usefulness": 0.6160711293064234,
-        "answer_quality": 0.6711474119562355
+        "usefulness": 0.6034446624316337,
+        "answer_quality": 0.6908188183604795
       },
+      "task_specific_score": 0.6379310344827587,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8800222279082575
+      "estimated_tokens": 69,
+      "estimated_cost_units": 0.069,
+      "latency_ms": 5.244863999905647,
+      "retrieval_latency_ms": 4.459039000721532,
+      "generation_latency_ms": 0.785284999437863,
+      "error_message": null,
+      "final_score": 0.9453017611895193
     },
     {
       "case_id": "meal_planning_04",
@@ -508,31 +628,39 @@
       "expected_agent": "meal_agent",
       "predicted_agent": "meal_agent",
       "retrieved_contexts": [
-        "Need lunches for Monday through Thursday.",
         "Family dietary restriction: gluten-free.",
-        "Budget cap for meals is $120."
+        "Need lunches for Monday through Thursday.",
+        "Pantry items available: sweet potatoes, spinach, onions."
       ],
       "reference_answer": "I suggested gluten-free lunches for four days and included a matching shopping list.",
-      "generated_answer": "I created a meal plan around Need lunches for Monday through Thursday; Family dietary restriction: gluten-free.",
+      "generated_answer": "I planned gluten-free lunches for the next four days with a shopping list around Family dietary restriction: gluten-free; Need lunches for Monday through Thursday.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.2967213114754098,
-        "rag_quality": 0.7408469945355192
+        "answer_relevance": 0.5417206290471785,
+        "rag_quality": 0.8020968239284613
       },
       "answer_metrics": {
-        "correctness": 0.32,
-        "completeness": 0.42857142857142855,
+        "correctness": 0.42307692307692313,
+        "completeness": 0.7142857142857143,
         "coherence": 1.0,
-        "usefulness": 0.5113231850117096,
-        "answer_quality": 0.5649736533957845
+        "usefulness": 0.669770816602454,
+        "answer_quality": 0.7017833634912729
       },
+      "task_specific_score": 0.6230769230769231,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.826455161982826
+      "estimated_tokens": 57,
+      "estimated_cost_units": 0.057,
+      "latency_ms": 4.55892500031041,
+      "retrieval_latency_ms": 4.0121140009432565,
+      "generation_latency_ms": 0.5461279997689417,
+      "error_message": null,
+      "final_score": 0.9608607499478834
     },
     {
       "case_id": "meal_planning_05",
@@ -547,29 +675,37 @@
       "retrieved_contexts": [
         "Budget cap for meals is $120.",
         "High protein meals are preferred during training week.",
-        "Weeknight dinners should take under 30 minutes."
+        "Pantry items available: ground turkey, carrots, pasta."
       ],
       "reference_answer": "I created a high-protein dinner plan that stays under the $120 budget.",
-      "generated_answer": "I created a meal plan around Budget cap for meals is $120; High protein meals are preferred during training week.",
+      "generated_answer": "I planned a high-protein dinner plan for training week and keep it under $120 around Budget cap for meals is $120; High protein meals are preferred during training week.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.36744680851063827,
-        "rag_quality": 0.7585283687943263
+        "answer_relevance": 0.5577185792349726,
+        "rag_quality": 0.8060963114754098
       },
       "answer_metrics": {
-        "correctness": 0.3524590163934426,
-        "completeness": 0.6153846153846154,
+        "correctness": 0.3967921896792189,
+        "completeness": 0.6923076923076923,
         "coherence": 1.0,
-        "usefulness": 0.5838226100721741,
-        "answer_quality": 0.6379165604625581
+        "usefulness": 0.661704615305471,
+        "answer_quality": 0.6877011243230955
       },
+      "task_specific_score": 0.6390134529147982,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8491112323142211
+      "estimated_tokens": 65,
+      "estimated_cost_units": 0.065,
+      "latency_ms": 4.939589000059641,
+      "retrieval_latency_ms": 4.3122009992657695,
+      "generation_latency_ms": 0.6268590004765429,
+      "error_message": null,
+      "final_score": 0.9601307151574298
     },
     {
       "case_id": "meal_planning_06",
@@ -583,30 +719,38 @@
       "predicted_agent": "meal_agent",
       "retrieved_contexts": [
         "Pantry items available: ground turkey, carrots, pasta.",
-        "One dinner should include fish once per week.",
-        "Vegetarian household preference is enabled for Mondays and Wednesdays."
+        "Budget cap for meals is $120.",
+        "Simple family dinners are preferred on Tuesdays."
       ],
       "reference_answer": "I suggested dinner ideas that use ground turkey, carrots, and pasta for this week.",
-      "generated_answer": "I created a meal plan around Pantry items available: ground turkey, carrots, pasta; One dinner should include fish once per week.",
+      "generated_answer": "I planned what can we make for dinner with ground turkey, carrots, and pasta this week? around Pantry items available: ground turkey, carrots, pasta; Budget cap for meals is $120.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3461667224640107,
-        "rag_quality": 0.544875013949336
+        "answer_relevance": 0.58078125,
+        "rag_quality": 0.8118619791666667
       },
       "answer_metrics": {
-        "correctness": 0.39514218009478674,
-        "completeness": 0.5,
+        "correctness": 0.40229885057471265,
+        "completeness": 0.7142857142857143,
         "coherence": 1.0,
-        "usefulness": 0.5603272256396994,
-        "answer_quality": 0.6138673514336215
+        "usefulness": 0.6743414537151068,
+        "answer_quality": 0.6977315046438834
       },
+      "task_specific_score": 0.6244635193133047,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7896855913457393
+      "estimated_tokens": 64,
+      "estimated_cost_units": 0.064,
+      "latency_ms": 5.106990000058431,
+      "retrieval_latency_ms": 4.488642000069376,
+      "generation_latency_ms": 0.617590998444939,
+      "error_message": null,
+      "final_score": 0.9618692926309395
     },
     {
       "case_id": "meal_planning_07",
@@ -620,30 +764,38 @@
       "predicted_agent": "meal_agent",
       "retrieved_contexts": [
         "One dinner should include fish once per week.",
-        "The household has two adults and two kids.",
-        "Simple family dinners are preferred on Tuesdays."
+        "Family likes mild flavors for weeknight dinners.",
+        "Fridge inventory includes leftover chicken and roasted vegetables."
       ],
       "reference_answer": "I planned three quick kid-friendly dinners and included one mild fish recipe.",
-      "generated_answer": "I created a meal plan around One dinner should include fish once per week; household has two adults and two kids.",
+      "generated_answer": "I planned three quick dinners with one fish recipe and keep the kids happy around One dinner should include fish once per week; Family likes mild flavors for weeknight dinners.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.30786494925839186,
-        "rag_quality": 0.5352995706479313
+        "answer_relevance": 0.4988385598141696,
+        "rag_quality": 0.7913763066202091
       },
       "answer_metrics": {
-        "correctness": 0.2689655172413793,
-        "completeness": 0.3076923076923077,
+        "correctness": 0.3563899868247694,
+        "completeness": 0.7692307692307693,
         "coherence": 1.0,
-        "usefulness": 0.47113069354801973,
-        "answer_quality": 0.5119471296204267
+        "usefulness": 0.656114828967427,
+        "answer_quality": 0.6954338962557414
       },
+      "task_specific_score": 0.6,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7618116750670895
+      "estimated_tokens": 66,
+      "estimated_cost_units": 0.066,
+      "latency_ms": 4.767938999066246,
+      "retrieval_latency_ms": 4.109376000997145,
+      "generation_latency_ms": 0.6581069992535049,
+      "error_message": null,
+      "final_score": 0.9547976417189575
     },
     {
       "case_id": "meal_planning_08",
@@ -657,30 +809,38 @@
       "predicted_agent": "meal_agent",
       "retrieved_contexts": [
         "Fridge inventory includes leftover chicken and roasted vegetables.",
-        "The household has two adults and two kids.",
-        "Pantry items available: chicken breast, broccoli, rice."
+        "Dinner plans should reuse leftovers when possible.",
+        "One dinner should include fish once per week."
       ],
       "reference_answer": "I made a meal plan that reuses the leftover chicken and roasted vegetables.",
-      "generated_answer": "I created a meal plan around Fridge inventory includes leftover chicken and roasted vegetables; household has two adults and two kids.",
+      "generated_answer": "I planned make a meal plan around the roasted vegetables and leftover chicken in the fridge? around Fridge inventory includes leftover chicken and roasted vegetables; Dinner plans should reuse leftovers when possible.",
       "rag_metrics": {
-        "context_precision": 0.6666666666666666,
-        "context_recall": 0.5,
-        "faithfulness": 1.0,
-        "answer_relevance": 0.45833333333333337,
-        "rag_quality": 0.65625
+        "context_precision": 1.0,
+        "context_recall": 1.0,
+        "faithfulness": 0.5,
+        "answer_relevance": 0.3216612377850163,
+        "rag_quality": 0.7054153094462541
       },
       "answer_metrics": {
-        "correctness": 0.49230289161639273,
-        "completeness": 0.6923076923076923,
+        "correctness": 0.4112125824454591,
+        "completeness": 0.7692307692307693,
         "coherence": 1.0,
-        "usefulness": 0.6607359793143546,
-        "answer_quality": 0.7113366408096099
+        "usefulness": 0.5005261473653112,
+        "answer_quality": 0.670242374760385
       },
+      "task_specific_score": 0.6265017667844522,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8418966602024025
+      "estimated_tokens": 71,
+      "estimated_cost_units": 0.071,
+      "latency_ms": 5.767559001469635,
+      "retrieval_latency_ms": 5.008269001336885,
+      "generation_latency_ms": 0.7584649993077619,
+      "error_message": null,
+      "final_score": 0.9350110717884955
     },
     {
       "case_id": "meal_planning_09",
@@ -694,30 +854,38 @@
       "predicted_agent": "meal_agent",
       "retrieved_contexts": [
         "Prep time should stay under 20 minutes on weeknights.",
-        "Weeknight dinners should take under 30 minutes.",
-        "High protein meals are preferred during training week."
+        "Family diet is dairy-free.",
+        "The household has two adults and two kids."
       ],
       "reference_answer": "I created a dairy-free weeknight meal plan with prep times under 20 minutes.",
-      "generated_answer": "I created a meal plan around Prep time should stay under 20 minutes on weeknights; Weeknight dinners should take under 30 minutes.",
+      "generated_answer": "I planned meals for the week that are dairy-free and keep prep under 20 minutes around Prep time should stay under 20 minutes on weeknights; Family diet is dairy-free.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.2647342995169082,
-        "rag_quality": 0.5245169082125604
+        "answer_relevance": 0.564312736443884,
+        "rag_quality": 0.8077448507776377
       },
       "answer_metrics": {
-        "correctness": 0.46496411988180664,
-        "completeness": 0.7142857142857143,
+        "correctness": 0.2945601851851852,
+        "completeness": 0.5,
         "coherence": 1.0,
-        "usefulness": 0.6109960334211073,
-        "answer_quality": 0.697561466897157
+        "usefulness": 0.5897182304072673,
+        "answer_quality": 0.5960696038981131
       },
+      "task_specific_score": 0.6372727272727272,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8055195937774293
+      "estimated_tokens": 68,
+      "estimated_cost_units": 0.068,
+      "latency_ms": 6.060026000341168,
+      "retrieval_latency_ms": 5.035721000240301,
+      "generation_latency_ms": 1.0232619988528313,
+      "error_message": null,
+      "final_score": 0.9418265381749165
     },
     {
       "case_id": "meal_planning_10",
@@ -731,30 +899,38 @@
       "predicted_agent": "meal_agent",
       "retrieved_contexts": [
         "The household has two adults and two kids.",
-        "Vegetarian household preference is enabled for Mondays and Wednesdays.",
-        "Pantry staples include rice, beans, oats, and canned tomatoes."
+        "Pantry staples include rice, beans, oats, and canned tomatoes.",
+        "Prep time should stay under 20 minutes on weeknights."
       ],
       "reference_answer": "I built a balanced family meal plan that leans on pantry staples like rice, beans, oats, and canned tomatoes.",
-      "generated_answer": "I created a meal plan around household has two adults and two kids; Vegetarian household preference is enabled for Mondays and Wednesdays.",
+      "generated_answer": "I planned build a balanced meal plan for two adults and two kids around household has two adults and two kids; Pantry staples include rice, beans, oats, and canned tomatoes.",
       "rag_metrics": {
-        "context_precision": 1.0,
+        "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3880803880803881,
-        "rag_quality": 0.8470200970200971
+        "answer_relevance": 0.5264890751272074,
+        "rag_quality": 0.7982889354484686
       },
       "answer_metrics": {
-        "correctness": 0.2538952275794381,
-        "completeness": 0.2631578947368421,
+        "correctness": 0.5468329664954756,
+        "completeness": 0.6842105263157895,
         "coherence": 1.0,
-        "usefulness": 0.47628337759916706,
-        "answer_quality": 0.4983341249788618
+        "usefulness": 0.6893831419846181,
+        "answer_quality": 0.7301066586989708
       },
+      "task_specific_score": 0.75177304964539,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8363385554997398
+      "estimated_tokens": 72,
+      "estimated_cost_units": 0.072,
+      "latency_ms": 9.279863001211197,
+      "retrieval_latency_ms": 8.11739500022668,
+      "generation_latency_ms": 1.161035999757587,
+      "error_message": null,
+      "final_score": 0.9779824263627541
     },
     {
       "case_id": "memory_lookup_01",
@@ -768,30 +944,38 @@
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
         "Family memory: the kids liked Mario's Pizza best for Friday dinners.",
-        "The kids voted for soccer practice this fall.",
-        "Spare keys are in the blue bowl by the front door."
+        "Notes mention cheese pizza and garlic knots.",
+        "Memory says Maya is allergic to strawberries and peanuts."
       ],
       "reference_answer": "We decided the kids liked Mario's Pizza best.",
-      "generated_answer": "We saved that the kids liked Mario's Pizza best for Friday dinners",
+      "generated_answer": "We saved that the kids liked Mario's Pizza best for Friday dinners.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3926282051282051,
-        "rag_quality": 0.5564903846153846
+        "answer_relevance": 0.3908898305084746,
+        "rag_quality": 0.7643891242937852
       },
       "answer_metrics": {
-        "correctness": 0.6205821205821206,
+        "correctness": 0.6263736263736264,
         "completeness": 0.875,
         "coherence": 1.0,
-        "usefulness": 0.7220525814275814,
-        "answer_quality": 0.8044086755024256
+        "usefulness": 0.7230658642205252,
+        "answer_quality": 0.8061098726485378
       },
+      "task_specific_score": 0.8203703703703703,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8402247650294525
+      "estimated_tokens": 49,
+      "estimated_cost_units": 0.049,
+      "latency_ms": 3.920084000128554,
+      "retrieval_latency_ms": 3.2391600016126176,
+      "generation_latency_ms": 0.6798609992983984,
+      "error_message": null,
+      "final_score": 0.9942258348504992
     },
     {
       "case_id": "memory_lookup_02",
@@ -804,31 +988,39 @@
       "expected_agent": "memory_agent",
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
-        "Family memory: the kids liked Mario's Pizza best for Friday dinners.",
-        "School pickup note: Ben should be collected by 3:15 PM.",
-        "The kids voted for soccer practice this fall."
+        "Memory says Maya is allergic to strawberries and peanuts.",
+        "Keep dessert labels clear for school events.",
+        "Notes mention cheese pizza and garlic knots."
       ],
       "reference_answer": "We saved that Maya is allergic to strawberries and peanuts.",
-      "generated_answer": "We saved that the kids liked Mario's Pizza best for Friday dinners",
+      "generated_answer": "We saved this allergy note: Maya is allergic to strawberries and peanuts.",
       "rag_metrics": {
-        "context_precision": 0.0,
-        "context_recall": 0.0,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.18763102725366876,
-        "rag_quality": 0.2969077568134172
+        "answer_relevance": 0.3108407079646018,
+        "rag_quality": 0.7443768436578171
       },
       "answer_metrics": {
-        "correctness": 0.2789473684210526,
-        "completeness": 0.3,
+        "correctness": 0.793123543123543,
+        "completeness": 0.9,
         "coherence": 1.0,
-        "usefulness": 0.44164459891868035,
-        "answer_quality": 0.5051479918349332
+        "usefulness": 0.7509910627720362,
+        "answer_quality": 0.8610286514738948
       },
+      "task_specific_score": 0.8757575757575757,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7005139371620877
+      "estimated_tokens": 43,
+      "estimated_cost_units": 0.043,
+      "latency_ms": 3.1224800004565623,
+      "retrieval_latency_ms": 3.0126630008453503,
+      "generation_latency_ms": 0.10928400115517434,
+      "error_message": null,
+      "final_score": 1.0
     },
     {
       "case_id": "memory_lookup_03",
@@ -841,31 +1033,39 @@
       "expected_agent": "memory_agent",
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
-        "Household memory: contact Ava Chen for babysitting on weekends.",
-        "Family memory: the kids liked Mario's Pizza best for Friday dinners.",
-        "Arrive two hours early for family flights."
+        "Do not move them without telling Sam.",
+        "Spare keys are in the blue bowl by the front door.",
+        "Preferred dentist office is Bright Smiles Dental."
       ],
       "reference_answer": "We planned to contact Ava Chen for babysitting on weekends.",
-      "generated_answer": "We saved that contact Ava Chen for babysitting on weekends",
+      "generated_answer": "We saved this date: Do not move them without telling Sam.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.0,
+        "context_recall": 0.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.23519736842105263,
-        "rag_quality": 0.5171326754385965
+        "answer_relevance": 0.20885826771653543,
+        "rag_quality": 0.30221456692913384
       },
       "answer_metrics": {
-        "correctness": 0.7863247863247863,
-        "completeness": 0.8,
+        "correctness": 0.25775862068965516,
+        "completeness": 0.1,
         "coherence": 1.0,
-        "usefulness": 0.7053805386864598,
-        "answer_quality": 0.8229263312528116
+        "usefulness": 0.39165422210154766,
+        "answer_quality": 0.4373532106978007
       },
+      "task_specific_score": 0.801063829787234,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8350147516728521
+      "estimated_tokens": 48,
+      "estimated_cost_units": 0.048,
+      "latency_ms": 4.285901000912418,
+      "retrieval_latency_ms": 4.259220000676578,
+      "generation_latency_ms": 0.026243998945574276,
+      "error_message": null,
+      "final_score": 0.8261395778603432
     },
     {
       "case_id": "memory_lookup_04",
@@ -879,30 +1079,38 @@
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
         "Spare keys are in the blue bowl by the front door.",
-        "Practice is on Tuesdays and Thursdays.",
-        "They accept the family insurance plan."
+        "Ava is available after 6 PM.",
+        "Do not move them without telling Sam."
       ],
       "reference_answer": "The spare keys are in the blue bowl by the front door.",
-      "generated_answer": "We saved that in the blue bowl by the front door",
+      "generated_answer": "We saved this spare keys and where they are kept: in the blue bowl by the front door.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.25862822193097423,
-        "rag_quality": 0.5229903888160768
+        "answer_relevance": 0.5088062622309197,
+        "rag_quality": 0.7938682322243966
       },
       "answer_metrics": {
-        "correctness": 0.6809954751131222,
-        "completeness": 0.7,
+        "correctness": 0.6754126110876005,
+        "completeness": 1.0,
         "coherence": 1.0,
-        "usefulness": 0.6599059242610241,
-        "answer_quality": 0.7602253498435365
+        "usefulness": 0.79605471832963,
+        "answer_quality": 0.8678668323543076
       },
+      "task_specific_score": 0.7838129496402878,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8208039346649034
+      "estimated_tokens": 55,
+      "estimated_cost_units": 0.055,
+      "latency_ms": 3.9103460003389046,
+      "retrieval_latency_ms": 3.8859140004205983,
+      "generation_latency_ms": 0.02395200135651976,
+      "error_message": null,
+      "final_score": 1.0
     },
     {
       "case_id": "memory_lookup_05",
@@ -916,30 +1124,38 @@
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
         "Preferred dentist office is Bright Smiles Dental.",
-        "Ava is available after 6 PM.",
-        "They accept the family insurance plan."
+        "They accept the family insurance plan.",
+        "Do not move them without telling Sam."
       ],
       "reference_answer": "We preferred Bright Smiles Dental after the last visit.",
-      "generated_answer": "We saved that Preferred dentist office is Bright Smiles Dental",
+      "generated_answer": "We saved that Preferred dentist office is Bright Smiles Dental.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.317048853439681,
-        "rag_quality": 0.7459288800265869
+        "answer_relevance": 0.31512605042016806,
+        "rag_quality": 0.7454481792717087
       },
       "answer_metrics": {
-        "correctness": 0.46062271062271065,
+        "correctness": 0.4667070217917676,
         "completeness": 0.5555555555555556,
         "coherence": 1.0,
-        "usefulness": 0.5833067799044868,
-        "answer_quality": 0.6498712615206883
+        "usefulness": 0.5843471569418728,
+        "answer_quality": 0.651652433572299
       },
+      "task_specific_score": 0.8624999999999999,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8489500353868189
+      "estimated_tokens": 40,
+      "estimated_cost_units": 0.04,
+      "latency_ms": 3.655702999822097,
+      "retrieval_latency_ms": 3.6411510009202175,
+      "generation_latency_ms": 0.014163999367156066,
+      "error_message": null,
+      "final_score": 0.9641015781375549
     },
     {
       "case_id": "memory_lookup_06",
@@ -953,30 +1169,38 @@
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
         "The kids voted for soccer practice this fall.",
-        "Family memory: the kids liked Mario's Pizza best for Friday dinners.",
-        "Household memory: contact Ava Chen for babysitting on weekends."
+        "They accept the family insurance plan.",
+        "Practice is on Tuesdays and Thursdays."
       ],
       "reference_answer": "The kids voted for soccer practice this fall.",
-      "generated_answer": "We saved that kids voted for soccer practice this fall",
+      "generated_answer": "We saved this after-school activity for this fall: kids voted for soccer practice this fall.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.35526315789473684,
-        "rag_quality": 0.5471491228070176
+        "answer_relevance": 0.4783950617283951,
+        "rag_quality": 0.7862654320987654
       },
       "answer_metrics": {
-        "correctness": 0.7525252525252526,
+        "correctness": 0.5976979225154407,
         "completeness": 0.875,
         "coherence": 1.0,
-        "usefulness": 0.7456971026049973,
-        "answer_quality": 0.8433055887825625
+        "usefulness": 0.737773246060959,
+        "answer_quality": 0.8026177921440999
       },
+      "task_specific_score": 0.7098540145985401,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8476136778973951
+      "estimated_tokens": 49,
+      "estimated_cost_units": 0.049,
+      "latency_ms": 4.011221000837395,
+      "retrieval_latency_ms": 3.986553998402087,
+      "generation_latency_ms": 0.024118999135680497,
+      "error_message": null,
+      "final_score": 0.9868493359146613
     },
     {
       "case_id": "memory_lookup_07",
@@ -991,29 +1215,37 @@
       "retrieved_contexts": [
         "Grandma's birthday gift idea was a framed family photo.",
         "Practice is on Tuesdays and Thursdays.",
-        "Family memory: the kids liked Mario's Pizza best for Friday dinners."
+        "Order by the end of June."
       ],
       "reference_answer": "We stored a framed family photo as Grandma's birthday gift idea.",
-      "generated_answer": "We saved that Grandma's birthday gift idea was a framed family photo",
+      "generated_answer": "We saved this Grandma's birthday gift idea: Grandma's birthday gift idea was a framed family photo.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.4537706611570248,
-        "rag_quality": 0.5717759986225895
+        "answer_relevance": 0.3799342105263158,
+        "rag_quality": 0.7616502192982456
       },
       "answer_metrics": {
-        "correctness": 0.6093073593073594,
+        "correctness": 0.560692375109553,
         "completeness": 0.8181818181818182,
         "coherence": 1.0,
-        "usefulness": 0.7203149596615506,
-        "answer_quality": 0.786951034287682
+        "usefulness": 0.6897021009544217,
+        "answer_quality": 0.7671440735614483
       },
+      "task_specific_score": 0.7749999999999999,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.839681758227568
+      "estimated_tokens": 46,
+      "estimated_cost_units": 0.046,
+      "latency_ms": 3.3561520012881374,
+      "retrieval_latency_ms": 3.337227999509196,
+      "generation_latency_ms": 0.018425998860038817,
+      "error_message": null,
+      "final_score": 0.9814709307219145
     },
     {
       "case_id": "memory_lookup_08",
@@ -1031,26 +1263,34 @@
         "Order by the end of June."
       ],
       "reference_answer": "Ben should be collected by 3:15 PM using the back gate when it rains.",
-      "generated_answer": "We saved that School pickup note: Ben should be collected by 3:15 PM",
+      "generated_answer": "We saved this school pickup: School pickup note: Ben should be collected by 3:15 PM.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.3416629809818664,
-        "rag_quality": 0.7520824119121332
+        "answer_relevance": 0.31676413255360625,
+        "rag_quality": 0.7458576998050682
       },
       "answer_metrics": {
-        "correctness": 0.4386513729579423,
+        "correctness": 0.41923436041083095,
         "completeness": 0.5333333333333333,
         "coherence": 1.0,
-        "usefulness": 0.5784119218182855,
-        "answer_quality": 0.6375991570273902
+        "usefulness": 0.5673329565744426,
+        "answer_quality": 0.6299751625796517
       },
+      "task_specific_score": 0.803956834532374,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8474203922348809
+      "estimated_tokens": 50,
+      "estimated_cost_units": 0.05,
+      "latency_ms": 3.3476280004833825,
+      "retrieval_latency_ms": 3.331276000608341,
+      "generation_latency_ms": 0.01596000038261991,
+      "error_message": null,
+      "final_score": 0.9536244879051723
     },
     {
       "case_id": "memory_lookup_09",
@@ -1064,30 +1304,38 @@
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
         "Saturday breakfast preference is blueberry pancakes.",
-        "Arrive two hours early for family flights.",
-        "The kids voted for soccer practice this fall."
+        "Serve with maple syrup and fruit.",
+        "Use the back gate when it rains."
       ],
       "reference_answer": "Our saved Saturday breakfast preference is blueberry pancakes.",
-      "generated_answer": "We saved that blueberry pancakes",
+      "generated_answer": "We saved this Saturday: blueberry pancakes.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.2299019607843137,
-        "rag_quality": 0.5158088235294117
+        "answer_relevance": 0.3229166666666667,
+        "rag_quality": 0.7473958333333334
       },
       "answer_metrics": {
-        "correctness": 0.4478723404255319,
-        "completeness": 0.375,
-        "coherence": 0.85,
-        "usefulness": 0.5131935753024615,
-        "answer_quality": 0.5465164789319983
+        "correctness": 0.5333333333333333,
+        "completeness": 0.5,
+        "coherence": 1.0,
+        "usefulness": 0.5890625,
+        "answer_quality": 0.6555989583333334
       },
+      "task_specific_score": 0.7166666666666666,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7655813256153525
+      "estimated_tokens": 33,
+      "estimated_cost_units": 0.033,
+      "latency_ms": 3.3357949996570824,
+      "retrieval_latency_ms": 3.3037850007531233,
+      "generation_latency_ms": 0.03136899977107532,
+      "error_message": null,
+      "final_score": 0.9509655788437563
     },
     {
       "case_id": "memory_lookup_10",
@@ -1101,30 +1349,38 @@
       "predicted_agent": "memory_agent",
       "retrieved_contexts": [
         "Holiday travel airport choice is Sacramento International.",
-        "They accept the family insurance plan.",
-        "Family memory: the kids liked Mario's Pizza best for Friday dinners."
+        "Arrive two hours early for family flights.",
+        "Serve with maple syrup and fruit."
       ],
       "reference_answer": "We picked Sacramento International as the holiday travel airport.",
-      "generated_answer": "We saved that Sacramento International",
+      "generated_answer": "We saved this holiday travel airport: Sacramento International.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.20413533834586467,
-        "rag_quality": 0.5093671679197995
+        "answer_relevance": 0.41785714285714287,
+        "rag_quality": 0.7711309523809524
       },
       "answer_metrics": {
-        "correctness": 0.42762577228596643,
-        "completeness": 0.3333333333333333,
-        "coherence": 0.85,
-        "usefulness": 0.4912736109912911,
-        "answer_quality": 0.5255581791526477
+        "correctness": 0.5149147727272727,
+        "completeness": 0.6666666666666666,
+        "coherence": 1.0,
+        "usefulness": 0.6498596455627705,
+        "answer_quality": 0.7078602712391775
       },
+      "task_specific_score": 0.8053719008264463,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7587313367681118
+      "estimated_tokens": 38,
+      "estimated_cost_units": 0.038,
+      "latency_ms": 3.505067999867606,
+      "retrieval_latency_ms": 3.4849179992306745,
+      "generation_latency_ms": 0.01975299892365001,
+      "error_message": null,
+      "final_score": 0.9748447147816729
     },
     {
       "case_id": "general_chat_01",
@@ -1137,31 +1393,39 @@
       "expected_agent": "general_agent",
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
-        "Dashboard summary: 1 overdue task, 2 upcoming meetings, 3 pending reminders.",
         "Upcoming events: 2 calendar entries this week.",
-        "Low stock items: milk, eggs, bananas."
+        "Household snapshot: 4 unfinished tasks.",
+        "High priority task: submit school form."
       ],
       "reference_answer": "You currently have 4 unfinished tasks and 2 upcoming events.",
-      "generated_answer": "Based on the household context, Dashboard summary: 1 overdue task, 2 upcoming meetings, 3 pending reminders and Upcoming events: 2 calendar entries this week.",
+      "generated_answer": "You asked how many open items and upcoming plans you have right now. You have Upcoming events: 2 calendar entries this week and Household snapshot: 4 unfinished tasks.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
-        "faithfulness": 1.0,
-        "answer_relevance": 0.1963876146788991,
-        "rag_quality": 0.5074302370030581
+        "context_precision": 0.6666666666666666,
+        "context_recall": 1.0,
+        "faithfulness": 0.5,
+        "answer_relevance": 0.4422907488986784,
+        "rag_quality": 0.6522393538913362
       },
       "answer_metrics": {
-        "correctness": 0.21363040629095675,
-        "completeness": 0.4,
+        "correctness": 0.3372797356828194,
+        "completeness": 0.9,
         "coherence": 1.0,
-        "usefulness": 0.452504505242464,
-        "answer_quality": 0.5165337278833552
+        "usefulness": 0.5448926211453744,
+        "answer_quality": 0.6955430892070484
       },
-      "hallucination_score": 0.0,
-      "hallucination_penalty": 1.0,
+      "task_specific_score": 0.40234741784037553,
+      "error_handling_score": 1.0,
+      "hallucination_score": 0.5,
+      "hallucination_penalty": 0.5,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7559909912216033
+      "estimated_tokens": 58,
+      "estimated_cost_units": 0.058,
+      "latency_ms": 7.5111789992661215,
+      "retrieval_latency_ms": 6.736452000041027,
+      "generation_latency_ms": 0.773808998928871,
+      "error_message": null,
+      "final_score": 0.8324753957974783
     },
     {
       "case_id": "general_chat_02",
@@ -1175,30 +1439,38 @@
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
         "The pantry is low on milk and eggs.",
-        "Keep it simple on practice nights.",
-        "Grocery list is active for the weekend."
+        "One task is overdue.",
+        "There are 3 pending reminders."
       ],
       "reference_answer": "Focus on the high priority school form first, then finish dinner prep.",
-      "generated_answer": "Based on the household context, pantry is low on milk and eggs and Keep it simple on practice nights.",
+      "generated_answer": "You asked what to focus on first this evening. For what to focus on first this evening, pantry is low on milk and eggs and One task is overdue.",
       "rag_metrics": {
         "context_precision": 0.0,
         "context_recall": 0.0,
-        "faithfulness": 1.0,
-        "answer_relevance": 0.1406202493159015,
-        "rag_quality": 0.28515506232897536
+        "faithfulness": 0.5,
+        "answer_relevance": 0.32664092664092664,
+        "rag_quality": 0.20666023166023167
       },
       "answer_metrics": {
-        "correctness": 0.23144399460188933,
-        "completeness": 0.16666666666666666,
+        "correctness": 0.22258551307847083,
+        "completeness": 0.25,
         "coherence": 1.0,
-        "usefulness": 0.3846827276461144,
-        "answer_quality": 0.4456983472286676
+        "usefulness": 0.3248066099298494,
+        "answer_quality": 0.4493480307520801
       },
+      "task_specific_score": 0.3752808988764045,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.6827133523894108
+      "estimated_tokens": 54,
+      "estimated_cost_units": 0.054,
+      "latency_ms": 3.888356999595999,
+      "retrieval_latency_ms": 3.8606289999734145,
+      "generation_latency_ms": 0.02665699867065996,
+      "error_message": null,
+      "final_score": 0.7666318356763603
     },
     {
       "case_id": "general_chat_03",
@@ -1211,31 +1483,39 @@
       "expected_agent": "general_agent",
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
-        "Pack water bottles for the kids.",
-        "Grocery list is active for the weekend.",
-        "Priority 1: send the school email reply."
+        "Household snapshot: 4 unfinished tasks.",
+        "Upcoming events: 2 calendar entries this week.",
+        "High priority task: submit school form."
       ],
       "reference_answer": "The household has 3 pending reminders, low milk and eggs, and 1 overdue task.",
-      "generated_answer": "Based on the household context, Pack water bottles for the kids.",
+      "generated_answer": "You asked for a household status summary. Here is the household status: Household snapshot: 4 unfinished tasks and Upcoming events: 2 calendar entries this week.",
       "rag_metrics": {
         "context_precision": 0.0,
         "context_recall": 0.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.34545454545454546,
-        "rag_quality": 0.33636363636363636
+        "answer_relevance": 0.28357487922705316,
+        "rag_quality": 0.3208937198067633
       },
       "answer_metrics": {
-        "correctness": 0.24620060790273557,
-        "completeness": 0.15384615384615385,
+        "correctness": 0.16872373949579833,
+        "completeness": 0.23076923076923078,
         "coherence": 1.0,
-        "usefulness": 0.4363753268008587,
-        "answer_quality": 0.45910552213743705
+        "usefulness": 0.4207669623730206,
+        "answer_quality": 0.45506498315951244
       },
+      "task_specific_score": 0.4111111111111111,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.6988672896252683
+      "estimated_tokens": 51,
+      "estimated_cost_units": 0.051,
+      "latency_ms": 2.991027999087237,
+      "retrieval_latency_ms": 2.9721470000367844,
+      "generation_latency_ms": 0.018349999663769267,
+      "error_message": null,
+      "final_score": 0.7943342699293833
     },
     {
       "case_id": "general_chat_04",
@@ -1249,30 +1529,38 @@
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
         "Reminder: lock the back door before leaving.",
-        "Grocery list is active for the weekend.",
-        "The pantry is low on milk and eggs."
+        "One task is overdue.",
+        "Pack water bottles for the kids."
       ],
       "reference_answer": "Lock the back door and pack water bottles before leaving.",
-      "generated_answer": "Based on the household context, Reminder: lock the back door before leaving.",
+      "generated_answer": "You asked for the best next step before leaving the house. For a quick household overview, Reminder: lock the back door before leaving and One task is overdue.",
       "rag_metrics": {
         "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.15340677274581804,
-        "rag_quality": 0.7050183598531212
+        "answer_relevance": 0.3374455732946299,
+        "rag_quality": 0.7510280599903241
       },
       "answer_metrics": {
-        "correctness": 0.4556390977443609,
-        "completeness": 0.6,
+        "correctness": 0.292022792022792,
+        "completeness": 0.7,
         "coherence": 1.0,
-        "usefulness": 0.5522614676225447,
-        "answer_quality": 0.6519751413417264
+        "usefulness": 0.5823670913293555,
+        "answer_quality": 0.6435974708380369
       },
+      "task_specific_score": 0.403448275862069,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8392483752987119
+      "estimated_tokens": 56,
+      "estimated_cost_units": 0.056,
+      "latency_ms": 3.2971000000543427,
+      "retrieval_latency_ms": 3.281032000813866,
+      "generation_latency_ms": 0.015673000234528445,
+      "error_message": null,
+      "final_score": 0.9171081131268781
     },
     {
       "case_id": "general_chat_05",
@@ -1286,30 +1574,38 @@
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
         "Pack water bottles for the kids.",
-        "Grocery list is active for the weekend.",
-        "The pantry is low on milk and eggs."
+        "Reminder: lock the back door before leaving.",
+        "Tonight's plan: soccer practice at 5:30 PM."
       ],
       "reference_answer": "Tonight the plan is soccer practice at 5:30 PM and leftover pasta afterward.",
-      "generated_answer": "Based on the household context, Pack water bottles for the kids.",
+      "generated_answer": "You asked what the current family plan for tonight is. The current family plan for tonight is Pack water bottles for the kids and Reminder: lock the back door before leaving.",
       "rag_metrics": {
-        "context_precision": 0.0,
-        "context_recall": 0.0,
+        "context_precision": 0.3333333333333333,
+        "context_recall": 0.5,
         "faithfulness": 1.0,
-        "answer_relevance": 0.25358255451713396,
-        "rag_quality": 0.3133956386292835
+        "answer_relevance": 0.3206954335986594,
+        "rag_quality": 0.5385071917329982
       },
       "answer_metrics": {
-        "correctness": 0.19316770186335402,
-        "completeness": 0.07142857142857142,
+        "correctness": 0.25133333333333335,
+        "completeness": 0.35714285714285715,
         "coherence": 1.0,
-        "usefulness": 0.37954470695226483,
-        "answer_quality": 0.41103524506104755
+        "usefulness": 0.48229290601871244,
+        "answer_quality": 0.5226922741237258
       },
+      "task_specific_score": 0.38256880733944953,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.6811077209225828
+      "estimated_tokens": 59,
+      "estimated_cost_units": 0.059,
+      "latency_ms": 2.988999000081094,
+      "retrieval_latency_ms": 2.9732639995927457,
+      "generation_latency_ms": 0.015265999536495656,
+      "error_message": null,
+      "final_score": 0.8482282301740383
     },
     {
       "case_id": "general_chat_06",
@@ -1322,31 +1618,39 @@
       "expected_agent": "general_agent",
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
-        "Grocery list is active for the weekend.",
-        "Upcoming events: 2 calendar entries this week.",
-        "There are 3 pending reminders."
+        "Dinner prep is already partially done.",
+        "There are 3 pending reminders.",
+        "High priority task: submit school form."
       ],
       "reference_answer": "Yes, the piano recital is Saturday at 4 PM and brunch with the grandparents is Sunday at 11 AM.",
-      "generated_answer": "Based on the household context, Upcoming events: 2 calendar entries this week.",
+      "generated_answer": "You asked whether anything important is coming up this weekend. This weekend, you have Dinner prep is already partially done and There are 3 pending reminders.",
       "rag_metrics": {
         "context_precision": 0.0,
         "context_recall": 0.0,
-        "faithfulness": 1.0,
-        "answer_relevance": 0.24637404580152672,
-        "rag_quality": 0.31159351145038167
+        "faithfulness": 0.5,
+        "answer_relevance": 0.37224842767295596,
+        "rag_quality": 0.218062106918239
       },
       "answer_metrics": {
-        "correctness": 0.17458788268036823,
-        "completeness": 0.0625,
+        "correctness": 0.17738407699037623,
+        "completeness": 0.125,
         "coherence": 1.0,
-        "usefulness": 0.37086548212047377,
-        "answer_quality": 0.4019883412002105
+        "usefulness": 0.29365812616583303,
+        "answer_quality": 0.39901055078905234
       },
+      "task_specific_score": 0.37005076142131976,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.6783954631626481
+      "estimated_tokens": 52,
+      "estimated_cost_units": 0.052,
+      "latency_ms": 3.311810000013793,
+      "retrieval_latency_ms": 3.2971500004350673,
+      "generation_latency_ms": 0.014083001588005573,
+      "error_message": null,
+      "final_score": 0.7584075112460898
     },
     {
       "case_id": "general_chat_07",
@@ -1360,30 +1664,38 @@
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
         "The pantry is low on milk and eggs.",
-        "Low stock items: milk, eggs, bananas.",
-        "There are 3 pending reminders."
+        "There are 3 pending reminders.",
+        "One task is overdue."
       ],
       "reference_answer": "You should restock milk, eggs, and bananas soon.",
-      "generated_answer": "Based on the household context, pantry is low on milk and eggs and milk, eggs, bananas.",
+      "generated_answer": "You asked which pantry items are low and need attention soon. The pantry items needing attention soon are pantry is low on milk and eggs and There are 3 pending reminders.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
-        "context_recall": 0.5,
+        "context_precision": 0.0,
+        "context_recall": 0.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.29276315789473684,
-        "rag_quality": 0.5315241228070176
+        "answer_relevance": 0.37986270022883295,
+        "rag_quality": 0.3449656750572082
       },
       "answer_metrics": {
-        "correctness": 0.3472222222222222,
-        "completeness": 0.5,
+        "correctness": 0.2183219178082192,
+        "completeness": 0.625,
         "coherence": 1.0,
-        "usefulness": 0.5349963450292398,
-        "answer_quality": 0.5955546418128654
+        "usefulness": 0.555796154509263,
+        "answer_quality": 0.5997795180793706
       },
+      "task_specific_score": 0.3666666666666666,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7817696911549707
+      "estimated_tokens": 59,
+      "estimated_cost_units": 0.059,
+      "latency_ms": 3.6694840000564,
+      "retrieval_latency_ms": 3.5542500008887146,
+      "generation_latency_ms": 0.11470099889265839,
+      "error_message": null,
+      "final_score": 0.8233344024689813
     },
     {
       "case_id": "general_chat_08",
@@ -1397,30 +1709,38 @@
       "predicted_agent": "general_agent",
       "retrieved_contexts": [
         "Pack water bottles for the kids.",
-        "The pantry is low on milk and eggs.",
-        "Priority 1: send the school email reply."
+        "Reminder: lock the back door before leaving.",
+        "Tonight's plan: soccer practice at 5:30 PM."
       ],
       "reference_answer": "The main priorities today are to send the school email reply and prepare lunch boxes.",
-      "generated_answer": "Based on the household context, Pack water bottles for the kids and pantry is low on milk and eggs.",
+      "generated_answer": "You asked for the main family priorities today. The main family priorities today are Pack water bottles for the kids and Reminder: lock the back door before leaving.",
       "rag_metrics": {
-        "context_precision": 0.3333333333333333,
+        "context_precision": 0.0,
         "context_recall": 0.5,
-        "faithfulness": 1.0,
-        "answer_relevance": 0.1356981981981982,
-        "rag_quality": 0.49225788288288286
+        "faithfulness": 0.5,
+        "answer_relevance": 0.31267777326290125,
+        "rag_quality": 0.3281694433157253
       },
       "answer_metrics": {
-        "correctness": 0.20962732919254656,
-        "completeness": 0.14285714285714285,
+        "correctness": 0.3151428571428571,
+        "completeness": 0.42857142857142855,
         "coherence": 1.0,
-        "usefulness": 0.3720456675619719,
-        "answer_quality": 0.4311325349029153
+        "usefulness": 0.3890980147442967,
+        "answer_quality": 0.5332030751146456
       },
+      "task_specific_score": 0.39473684210526316,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.7308476044464496
+      "estimated_tokens": 58,
+      "estimated_cost_units": 0.058,
+      "latency_ms": 3.189154000210692,
+      "retrieval_latency_ms": 3.172681999785709,
+      "generation_latency_ms": 0.01594500099599827,
+      "error_message": null,
+      "final_score": 0.8095133912590965
     },
     {
       "case_id": "general_chat_09",
@@ -1435,29 +1755,37 @@
       "retrieved_contexts": [
         "If soccer runs late, dinner becomes sandwiches and fruit.",
         "Keep it simple on practice nights.",
-        "Dinner is leftover pasta after practice."
+        "Priority 2: prepare lunch boxes."
       ],
       "reference_answer": "If practice runs late, the fallback plan is sandwiches and fruit.",
-      "generated_answer": "Based on the household context, If soccer runs late, dinner becomes sandwiches and fruit and Keep it simple on practice nights.",
+      "generated_answer": "You asked what we decided if practice runs late. What we decided is If soccer runs late, dinner becomes sandwiches and fruit and Keep it simple on practice nights.",
       "rag_metrics": {
-        "context_precision": 1.0,
+        "context_precision": 0.6666666666666666,
         "context_recall": 1.0,
         "faithfulness": 1.0,
-        "answer_relevance": 0.2179089026915114,
-        "rag_quality": 0.8044772256728778
+        "answer_relevance": 0.3069053708439898,
+        "rag_quality": 0.7433930093776641
       },
       "answer_metrics": {
-        "correctness": 0.4005681818181818,
+        "correctness": 0.39035087719298245,
         "completeness": 0.7272727272727273,
         "coherence": 1.0,
-        "usefulness": 0.5864374529456051,
-        "answer_quality": 0.6785695905091286
+        "usefulness": 0.6061322438274249,
+        "answer_quality": 0.6809389620732836
       },
+      "task_specific_score": 0.46272727272727276,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.8707617040455016
+      "estimated_tokens": 57,
+      "estimated_cost_units": 0.057,
+      "latency_ms": 2.838972000972717,
+      "retrieval_latency_ms": 2.8223770004842663,
+      "generation_latency_ms": 0.01614199936739169,
+      "error_message": null,
+      "final_score": 0.9289483908378985
     },
     {
       "case_id": "general_chat_10",
@@ -1472,35 +1800,54 @@
       "retrieved_contexts": [
         "Pack water bottles for the kids.",
         "Reminder: lock the back door before leaving.",
-        "The pantry is low on milk and eggs."
+        "Tonight's plan: soccer practice at 5:30 PM."
       ],
       "reference_answer": "Today the dashboard shows 1 overdue task, 2 upcoming meetings, 3 pending reminders, and a breakfast restock.",
-      "generated_answer": "Based on the household context, Pack water bottles for the kids and Reminder: lock the back door before leaving.",
+      "generated_answer": "You asked what the family dashboard looks like today. Here is the family dashboard for today: Pack water bottles for the kids and Reminder: lock the back door before leaving.",
       "rag_metrics": {
         "context_precision": 0.0,
         "context_recall": 0.0,
-        "faithfulness": 1.0,
-        "answer_relevance": 0.1654874213836478,
-        "rag_quality": 0.2913718553459119
+        "faithfulness": 0.5,
+        "answer_relevance": 0.30552036199095023,
+        "rag_quality": 0.20138009049773756
       },
       "answer_metrics": {
-        "correctness": 0.1903409090909091,
-        "completeness": 0.11764705882352941,
+        "correctness": 0.2222222222222222,
+        "completeness": 0.23529411764705882,
         "coherence": 1.0,
-        "usefulness": 0.3683688473245216,
-        "answer_quality": 0.41908920380974
+        "usefulness": 0.31575917546505783,
+        "answer_quality": 0.44331887883358473
       },
+      "task_specific_score": 0.38256880733944953,
+      "error_handling_score": 1.0,
       "hallucination_score": 0.0,
       "hallucination_penalty": 1.0,
       "tool_selection_accuracy": 1.0,
       "routing_accuracy": 1.0,
-      "final_score": 0.677615264788913
+      "estimated_tokens": 59,
+      "estimated_cost_units": 0.059,
+      "latency_ms": 2.992277000885224,
+      "retrieval_latency_ms": 2.9729899997619214,
+      "generation_latency_ms": 0.01864500154624693,
+      "error_message": null,
+      "final_score": 0.7649280694064428
     }
   ],
   "meta": {
     "description": "Synthetic regression dataset for routing, tool selection, RAG quality, answer quality, and hallucination checks.",
     "generated_at": "2026-06-09",
     "cases_per_domain": 10,
-    "total_cases": 40
+    "total_cases": 40,
+    "prompt_registry_version": "2026-06-10.1",
+    "prompt_versions": {
+      "orchestrator.system": "1.0.0",
+      "orchestrator.intent": "1.0.0",
+      "email.action_items": "1.0.0",
+      "email.extract": "1.0.0",
+      "grocery.suggestions": "1.0.0",
+      "meal.recipe_selection": "1.0.0"
+    },
+    "evaluation_version": "2026-06-10.1",
+    "dataset_version": "familyops_synthetic_eval_v1"
   }
 }

@@ -1,13 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
 from app.db.database import get_db
-from app.db.models import AgentRun, Task, CalendarEvent, GroceryList, GroceryItem, Reminder, Memory, MealPlan, FamilyMember, PantryItem
+from app.db.models import AgentRun, Task, CalendarEvent, GroceryList, GroceryItem, Reminder, Memory, MealPlan, FamilyMember, PantryItem, User
 from app.agents.orchestrator import orchestrator
+from app.core.auth import get_optional_current_user
+from app.core.ownership import get_owner_family_member_id, metadata_matches_owner
 from app.services.pantry_service import pantry_service
+from app.services.privacy import redact_pii_in_obj
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -17,13 +20,21 @@ class AgentRequest(BaseModel):
     context: Dict[str, Any] = Field(default_factory=dict)
 
 
-async def _fetch_db_context(db: AsyncSession) -> Dict[str, Any]:
+async def _fetch_db_context(db: AsyncSession, owner_family_member_id: Optional[str] = None) -> Dict[str, Any]:
     """Pre-fetch relevant household data to give the LLM real context."""
     now = datetime.utcnow()
     week_ahead = now + timedelta(days=7)
 
     # Tasks
-    tasks_result = await db.execute(select(Task).order_by(Task.created_at.desc()).limit(20))
+    tasks_query = select(Task).order_by(Task.created_at.desc()).limit(20)
+    if owner_family_member_id:
+        tasks_query = tasks_query.where(
+            or_(
+                Task.created_by.is_(None),
+                Task.created_by == owner_family_member_id,
+            )
+        )
+    tasks_result = await db.execute(tasks_query)
     tasks = tasks_result.scalars().all()
 
     # Upcoming calendar events
@@ -32,12 +43,23 @@ async def _fetch_db_context(db: AsyncSession) -> Dict[str, Any]:
         .where(CalendarEvent.start_time >= now, CalendarEvent.start_time <= week_ahead)
         .order_by(CalendarEvent.start_time.asc()).limit(10)
     )
-    events = events_result.scalars().all()
+    events = [
+        event
+        for event in events_result.scalars().all()
+        if metadata_matches_owner(event.extra_data or {}, owner_family_member_id)
+    ]
 
     # Pending reminders
+    reminders_query = select(Reminder).where(Reminder.status == "pending")
+    if owner_family_member_id:
+        reminders_query = reminders_query.where(
+            or_(
+                Reminder.member_id.is_(None),
+                Reminder.member_id == owner_family_member_id,
+            )
+        )
     reminders_result = await db.execute(
-        select(Reminder).where(Reminder.status == "pending")
-        .order_by(Reminder.remind_at.asc()).limit(10)
+        reminders_query.order_by(Reminder.remind_at.asc()).limit(10)
     )
     reminders = reminders_result.scalars().all()
 
@@ -72,13 +94,17 @@ async def _fetch_db_context(db: AsyncSession) -> Dict[str, Any]:
     memories_result = await db.execute(
         select(Memory).order_by(Memory.created_at.desc()).limit(15)
     )
-    memories = memories_result.scalars().all()
+    memories = [
+        memory
+        for memory in memories_result.scalars().all()
+        if metadata_matches_owner(memory.memory_metadata or {}, owner_family_member_id)
+    ]
 
     # Family members
     members_result = await db.execute(select(FamilyMember))
     members = members_result.scalars().all()
 
-    return {
+    return redact_pii_in_obj({
         "tasks": [
             {
                 "id": t.id, "title": t.title, "status": t.status,
@@ -154,26 +180,51 @@ async def _fetch_db_context(db: AsyncSession) -> Dict[str, Any]:
             }
             for m in members
         ],
-    }
+    }, source="agent.db_context")
 
 
 @router.post("/chat")
-async def chat_with_agent(request: AgentRequest, db: AsyncSession = Depends(get_db)):
+async def chat_with_agent(
+    request: AgentRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+):
     import time
     start = time.time()
+    owner_family_member_id = get_owner_family_member_id(current_user)
 
     run = AgentRun(
         agent_name="orchestrator",
         status="running",
-        input_data={"message": request.message, "context": request.context},
+        input_data={
+            "message": request.message,
+            "context": request.context,
+            "user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "full_name": current_user.full_name,
+                "role": current_user.role.value if current_user else None,
+                "family_member_id": current_user.family_member_id if current_user else None,
+            } if current_user else None,
+        },
     )
     db.add(run)
     await db.flush()
 
     try:
         # Pre-fetch real household data for the LLM
-        db_context = await _fetch_db_context(db)
-        merged_context = {**request.context, "db_context": db_context, "db": db}
+        db_context = await _fetch_db_context(db, owner_family_member_id)
+        merged_context = {
+            **request.context,
+            "db_context": db_context,
+            "db": db,
+            "auth": {
+                "user_id": current_user.id,
+                "user_email": current_user.email,
+                "role": current_user.role.value if current_user else None,
+                "family_member_id": current_user.family_member_id if current_user else None,
+            } if current_user else None,
+        }
 
         result = await orchestrator.run(request.message, merged_context)
         duration_ms = int((time.time() - start) * 1000)

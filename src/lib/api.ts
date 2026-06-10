@@ -1,5 +1,7 @@
 import axios from "axios";
 
+export const AUTH_TOKEN_KEY = "familyops_api_token";
+
 const getApiToken = () => {
   const envToken = process.env.NEXT_PUBLIC_API_BEARER_TOKEN;
 
@@ -7,7 +9,31 @@ const getApiToken = () => {
     return envToken;
   }
 
-  return window.localStorage.getItem("familyops_api_token") || envToken;
+  return window.localStorage.getItem(AUTH_TOKEN_KEY) || envToken;
+};
+
+export const getStoredAuthToken = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+export const setStoredAuthToken = (token: string) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+};
+
+export const clearStoredAuthToken = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
 };
 
 const api = axios.create({
@@ -46,6 +72,7 @@ export const dashboardApi = {
   getSummary: () => api.get("/dashboard/summary"),
   getActivityFeed: () => api.get("/dashboard/activity-feed"),
   getHealth: () => api.get("/dashboard/health"),
+  getVersion: () => api.get("/dashboard/version"),
 };
 
 export const tasksApi = {
@@ -127,4 +154,11 @@ export const agentApi = {
   listRuns: (params?: Record<string, string>) => api.get("/agent/runs", { params }),
   getRun: (id: string) => api.get(`/agent/runs/${id}`),
   stats: () => api.get("/agent/stats"),
+};
+
+export const authApi = {
+  login: (data: { email: string; password: string }) => api.post("/auth/login", data),
+  register: (data: { email: string; password: string; full_name?: string | null }) =>
+    api.post("/auth/register", data),
+  me: () => api.get("/auth/me"),
 };

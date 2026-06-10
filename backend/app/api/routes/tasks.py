@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from enum import Enum
 
+from app.core.auth import get_optional_current_user
+from app.core.ownership import get_owner_family_member_id, with_owner_metadata
 from app.db.database import get_db
 from app.db.models import Task
 from app.events.bus import event_bus
+from app.db.models import User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -61,6 +64,7 @@ class TaskResponse(BaseModel):
     priority: str
     due_date: Optional[datetime]
     assignee_id: Optional[str]
+    created_by: Optional[str] = None
     tags: List[str]
     agent_generated: bool
     created_at: datetime
@@ -68,6 +72,17 @@ class TaskResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def _apply_owner_scope(query, owner_family_member_id: Optional[str]):
+    if owner_family_member_id:
+        query = query.where(
+            or_(
+                Task.created_by.is_(None),
+                Task.created_by == owner_family_member_id,
+            )
+        )
+    return query
 
 
 # ============================================================
@@ -78,9 +93,14 @@ class TaskResponse(BaseModel):
 
 @router.get("/stats/summary")
 async def task_stats(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    result = await db.execute(select(Task))
+    owner_family_member_id = get_owner_family_member_id(current_user)
+
+    query = select(Task)
+    query = _apply_owner_scope(query, owner_family_member_id)
+    result = await db.execute(query)
     tasks = result.scalars().all()
 
     stats = {
@@ -125,9 +145,12 @@ async def list_tasks(
     status: Optional[str] = Query(None),
     priority: Optional[str] = Query(None),
     assignee_id: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     query = select(Task)
+    owner_family_member_id = get_owner_family_member_id(current_user)
+    query = _apply_owner_scope(query, owner_family_member_id)
 
     if status:
         query = query.where(Task.status == status)
@@ -160,10 +183,14 @@ async def list_tasks(
 )
 async def create_task(
     task: TaskCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
+    owner_family_member_id = get_owner_family_member_id(current_user)
     db_task = Task(
-        **task.model_dump()
+        **task.model_dump(),
+        created_by=owner_family_member_id,
+        extra_data=with_owner_metadata({}, owner_family_member_id),
     )
 
     db.add(db_task)
@@ -192,13 +219,13 @@ async def create_task(
 )
 async def get_task(
     task_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    result = await db.execute(
-        select(Task).where(
-            Task.id == task_id
-        )
-    )
+    owner_family_member_id = get_owner_family_member_id(current_user)
+    query = select(Task).where(Task.id == task_id)
+    query = _apply_owner_scope(query, owner_family_member_id)
+    result = await db.execute(query)
 
     task = result.scalar_one_or_none()
 
@@ -222,13 +249,13 @@ async def get_task(
 async def update_task(
     task_id: str,
     task_update: TaskUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    result = await db.execute(
-        select(Task).where(
-            Task.id == task_id
-        )
-    )
+    owner_family_member_id = get_owner_family_member_id(current_user)
+    query = select(Task).where(Task.id == task_id)
+    query = _apply_owner_scope(query, owner_family_member_id)
+    result = await db.execute(query)
 
     task = result.scalar_one_or_none()
 
@@ -276,13 +303,13 @@ async def update_task(
 )
 async def delete_task(
     task_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    result = await db.execute(
-        select(Task).where(
-            Task.id == task_id
-        )
-    )
+    owner_family_member_id = get_owner_family_member_id(current_user)
+    query = select(Task).where(Task.id == task_id)
+    query = _apply_owner_scope(query, owner_family_member_id)
+    result = await db.execute(query)
 
     task = result.scalar_one_or_none()
 

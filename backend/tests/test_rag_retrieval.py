@@ -6,7 +6,11 @@ sys.path.insert(0, str(ROOT))
 
 from app.services.rag_retrieval import (  # noqa: E402
     build_context_from_candidates,
+    bm25_score,
+    cross_encoder_rerank_candidates,
     metadata_matches,
+    rank_candidates_by_bm25,
+    reciprocal_rank_fusion,
     rerank_candidates,
     rewrite_retrieval_query,
     split_semantic_chunks,
@@ -74,6 +78,70 @@ def test_rerank_candidates_prefers_relevant_candidate():
 
     assert ranked[0]["id"] == "1"
     assert ranked[0]["score"] >= ranked[0]["rerank_score"] - 1e-6
+
+
+def test_bm25_prefers_exact_keyword_match():
+    candidates = [
+        {
+            "id": "1",
+            "content": "Family day out at the aquarium with tickets booked.",
+            "memory_type": "event",
+            "metadata": {"source": "event"},
+        },
+        {
+            "id": "2",
+            "content": "Aquarium opening hours and family-friendly visit tips for the weekend.",
+            "memory_type": "event",
+            "metadata": {"source": "event"},
+        },
+    ]
+
+    ranked = rank_candidates_by_bm25("aquarium tickets", candidates)
+
+    assert ranked[0]["id"] == "1"
+    assert ranked[0]["bm25_score"] >= ranked[1]["bm25_score"]
+    assert bm25_score("aquarium tickets", ranked[0]["content"]) >= bm25_score(
+        "aquarium tickets",
+        ranked[1]["content"],
+    )
+
+
+def test_reciprocal_rank_fusion_combines_rankings():
+    fused = reciprocal_rank_fusion(
+        [
+            ["a", "b", "c"],
+            ["c", "b", "d"],
+        ]
+    )
+
+    assert fused["b"] > fused["a"]
+    assert fused["c"] > fused["a"]
+    assert fused["b"] > fused["d"]
+
+
+def test_cross_encoder_rerank_can_reorder_top_candidates():
+    class FakeScorer:
+        def predict(self, pairs):
+            scores = []
+            for _, candidate_text in pairs:
+                scores.append(0.95 if "dentist" in candidate_text.lower() else 0.10)
+            return scores
+
+    candidates = [
+        {"id": "1", "content": "Lunch plans for next week.", "metadata": {}, "score": 0.3},
+        {"id": "2", "content": "Dentist appointment reminder for Thursday.", "metadata": {}, "score": 0.3},
+        {"id": "3", "content": "Grocery list for the weekend.", "metadata": {}, "score": 0.3},
+    ]
+
+    ranked = cross_encoder_rerank_candidates(
+        "dentist appointment",
+        candidates,
+        top_n=2,
+        scorer=FakeScorer(),
+    )
+
+    assert ranked[0]["id"] == "2"
+    assert ranked[0]["cross_encoder_score"] > ranked[1]["cross_encoder_score"]
 
 
 def test_build_context_from_candidates_limits_budget():

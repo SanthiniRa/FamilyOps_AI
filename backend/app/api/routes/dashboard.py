@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, timezone
+from app.core.config import settings
+from app.core.prompt_versioning import PROMPT_REGISTRY_VERSION, prompt_versions
 from app.db.database import get_db
-from app.db.models import Task, CalendarEvent, GroceryList, MealPlan, Reminder, AgentRun, HouseholdMemory, FamilyMember
+from app.db.models import Task, CalendarEvent, GroceryList, MealPlan, Reminder, AgentRun, HouseholdMemory, FamilyMember, Email
+from app.services.email_filter import evaluate_email_importance, important_email_keywords
 from app.observability.token_tracker import (
     token_tracker
 )
+from app.core.resilience import shared_resilience_health
+from typing import Any, Dict, List
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -18,11 +23,94 @@ def _normalize_json_value(value, fallback):
         return value
     return fallback
 
+def _matched_email_keywords(email: Email) -> List[str]:
+    extra_data = email.extra_data or {}
+    stored_keywords = extra_data.get("matched_keywords") if isinstance(extra_data, dict) else None
+    if isinstance(stored_keywords, list) and stored_keywords:
+        return [str(keyword).strip().lower() for keyword in stored_keywords if str(keyword).strip()]
+
+    importance = _email_importance(email)
+    return importance.matched_keywords
+
+
+def _email_importance(email: Email):
+    extra_data = email.extra_data or {}
+    attachment_text = extra_data.get("attachment_text", "") if isinstance(extra_data, dict) else ""
+    return evaluate_email_importance(
+        subject=getattr(email, "subject", "") or "",
+        sender=getattr(email, "sender", "") or "",
+        body_text=getattr(email, "body_text", "") or "",
+        body_html=getattr(email, "body_html", "") or "",
+        attachment_text=attachment_text,
+        summary=getattr(email, "summary", "") or "",
+        action_items=getattr(email, "action_items", []) or [],
+        category=getattr(email, "category", None),
+    )
+
+
+def _important_email_reason(email: Email, matched_keywords: List[str]) -> str:
+    extra_data = email.extra_data or {}
+    reason = extra_data.get("importance_reason") if isinstance(extra_data, dict) else None
+    if reason:
+        return str(reason)
+
+    importance = _email_importance(email)
+    return importance.reason
+
+
+def _serialize_important_email(email: Email, matched_keywords: List[str]) -> Dict[str, Any]:
+    snippet_source = email.summary or email.body_text or ""
+    snippet = " ".join(snippet_source.split())
+    if len(snippet) > 180:
+        snippet = f"{snippet[:177].rstrip()}..."
+
+    extra_data = email.extra_data or {}
+    importance = _email_importance(email)
+    subject_keywords = extra_data.get("subject_keywords") if isinstance(extra_data, dict) else None
+    matched_senders = extra_data.get("matched_senders") if isinstance(extra_data, dict) else []
+    matched_domains = extra_data.get("matched_domains") if isinstance(extra_data, dict) else []
+
+    return {
+        "id": email.id,
+        "subject": email.subject,
+        "sender": email.sender,
+        "received_at": email.received_at.isoformat() if email.received_at else None,
+        "category": email.category,
+        "summary": email.summary,
+        "action_item_count": len(email.action_items or []),
+        "matched_keywords": matched_keywords or importance.matched_keywords,
+        "subject_keywords": subject_keywords or importance.subject_keywords,
+        "matched_senders": matched_senders or importance.matched_senders,
+        "matched_domains": matched_domains or importance.matched_domains,
+        "reason": _important_email_reason(email, matched_keywords),
+        "snippet": snippet,
+    }
+
+
+def _select_important_emails(emails: List[Email]) -> List[Dict[str, Any]]:
+    scored = []
+    for email in emails:
+        importance = _email_importance(email)
+        matched_keywords = importance.matched_keywords
+        actionable = importance.is_important
+
+        if not actionable:
+            continue
+
+        received_at = email.received_at or datetime.min.replace(tzinfo=timezone.utc)
+        scored.append((importance.score, received_at, email, matched_keywords))
+
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [
+        _serialize_important_email(email, matched_keywords)
+        for _, _, email, matched_keywords in scored[:5]
+    ]
+
 
 @router.get("/summary")
 async def dashboard_summary(db: AsyncSession = Depends(get_db)):
-    now = datetime.utcnow()
-    today_start = datetime.combine(date.today(), datetime.min.time())
+    now = datetime.now(timezone.utc)
+    today_start = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
     today_end = today_start + timedelta(days=1)
     week_end = now + timedelta(days=7)
 
@@ -58,6 +146,18 @@ async def dashboard_summary(db: AsyncSession = Depends(get_db)):
 
     members_result = await db.execute(select(FamilyMember))
     members = members_result.scalars().all()
+
+    emails_result = await db.execute(
+        select(Email)
+        .where(
+            Email.received_at >= today_start,
+            Email.received_at < today_end,
+        )
+        .order_by(Email.received_at.desc())
+        .limit(50)
+    )
+    today_emails = emails_result.scalars().all()
+    important_emails = _select_important_emails(today_emails)
 
     pending_tasks = [t for t in tasks if t.status == "pending"]
     overdue_tasks = [t for t in tasks if t.due_date and t.due_date < now and t.status != "completed"]
@@ -114,6 +214,12 @@ async def dashboard_summary(db: AsyncSession = Depends(get_db)):
                 for r in recent_runs
             ],
         },
+        "emails": {
+            "today_count": len(today_emails),
+            "important_today_count": len(important_emails),
+            "important_today": important_emails,
+            "keywords": important_email_keywords(),
+        },
         "generated_at": now.isoformat(),
     }
 
@@ -138,12 +244,28 @@ async def activity_feed(db: AsyncSession = Depends(get_db)):
 
 @router.get("/health")
 async def health():
+    resilience = await shared_resilience_health()
     return {
         "status": "healthy",
         "service": "FamilyOps AI",
-        "version": "1.0.0",
+        "version": settings.app_version,
+        "timestamp": datetime.utcnow().isoformat(),
+        "shared_resilience_redis": resilience,
+    }
+
+
+@router.get("/version")
+async def version():
+    versions = prompt_versions()
+    return {
+        "service": settings.app_name,
+        "app_version": settings.app_version,
+        "prompt_registry_version": PROMPT_REGISTRY_VERSION,
+        "prompt_count": len(versions),
+        "prompt_versions": versions,
         "timestamp": datetime.utcnow().isoformat(),
     }
+
 
 @router.get("/metrics")
 

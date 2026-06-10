@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Settings, Database, Key, Bell, Bot, Cpu, ExternalLink, CheckCircle, XCircle } from "lucide-react";
+import { Settings, Database, Key, Bell, Bot, Cpu, ExternalLink, CheckCircle, XCircle, CloudSun, CalendarDays, UtensilsCrossed } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardApi } from "@/lib/api";
 
@@ -16,6 +16,18 @@ export default function SettingsPage() {
     queryFn: () => dashboardApi.getHealth().then((r) => r.data),
     retry: false,
   });
+
+  const { data: versionInfo } = useQuery({
+    queryKey: ["dashboard-version"],
+    queryFn: () => dashboardApi.getVersion().then((r) => r.data),
+    retry: false,
+  });
+
+  const sharedRedis = health?.shared_resilience_redis as
+    | { enabled?: boolean; available?: boolean; detail?: string; backend?: string }
+    | undefined;
+  const promptVersions = (versionInfo?.prompt_versions ?? {}) as Record<string, string>;
+  const promptEntries = Object.entries(promptVersions) as Array<[string, string]>;
 
   const tabs = [
     { id: "integrations", label: "Integrations" },
@@ -103,6 +115,48 @@ export default function SettingsPage() {
               { label: "App Password", placeholder: "xxxx xxxx xxxx xxxx", env: "EMAIL_PASSWORD" },
             ]}
           />
+          <IntegrationCard
+            icon={<ExternalLink className="h-5 w-5 text-cyan-500" />}
+            title="Web Search"
+            description="Fetches current external information with a pluggable provider layer."
+            status="active"
+            fields={[
+              { label: "Provider", placeholder: "duckduckgo | tavily | auto", env: "WEB_SEARCH_PROVIDER" },
+              { label: "Tavily API Key", placeholder: "tvly-...", env: "WEB_SEARCH_TAVILY_API_KEY" },
+              { label: "Tavily Depth", placeholder: "basic", env: "WEB_SEARCH_TAVILY_SEARCH_DEPTH" },
+              { label: "Max Results", placeholder: "5", env: "WEB_SEARCH_MAX_RESULTS" },
+              { label: "Fetch Pages", placeholder: "3", env: "WEB_SEARCH_FETCH_LIMIT" },
+            ]}
+          />
+          <IntegrationCard
+            icon={<CloudSun className="h-5 w-5 text-sky-500" />}
+            title="Weather"
+            description="UK-friendly weather forecasts and current conditions powered by Open-Meteo."
+            status="active"
+            fields={[
+              { label: "Country Code", placeholder: "GB", env: "WEATHER_DEFAULT_COUNTRY_CODE" },
+              { label: "Forecast Days", placeholder: "5", env: "WEATHER_FORECAST_DAYS" },
+            ]}
+          />
+          <IntegrationCard
+            icon={<CalendarDays className="h-5 w-5 text-rose-500" />}
+            title="Family Events"
+            description="Search local family-friendly events around the area using Ticketmaster."
+            status="configure"
+            fields={[
+              { label: "API Key", placeholder: "TM...", env: "TICKETMASTER_API_KEY" },
+              { label: "Country Code", placeholder: "GB", env: "EVENT_SEARCH_COUNTRY_CODE" },
+            ]}
+          />
+          <IntegrationCard
+            icon={<UtensilsCrossed className="h-5 w-5 text-orange-500" />}
+            title="Recipe Search"
+            description="Search external recipe ideas and meal inspiration from TheMealDB."
+            status="active"
+            fields={[
+              { label: "Provider", placeholder: "themealdb", env: "RECIPE_SEARCH_PROVIDER" },
+            ]}
+          />
         </div>
       )}
 
@@ -126,6 +180,10 @@ export default function SettingsPage() {
                   { name: "Reminder Agent", desc: "Schedules and dispatches family reminders", status: "active" },
                   { name: "Memory Agent", desc: "Stores and retrieves household knowledge via RAG", status: "active" },
                   { name: "Task Agent", desc: "Task orchestration and assignment", status: "active" },
+                  { name: "Web Search Agent", desc: "Fetches current web results when household data is not enough", status: "active" },
+                  { name: "Weather Agent", desc: "Fetches live weather for UK and other locations", status: "active" },
+                  { name: "Event Agent", desc: "Finds family-friendly events around the area", status: "active" },
+                  { name: "Recipe Agent", desc: "Searches external recipe ideas and cooking inspiration", status: "active" },
                 ].map((agent) => (
                   <div key={agent.name} className="flex items-center justify-between rounded-md border p-3">
                     <div>
@@ -152,6 +210,15 @@ export default function SettingsPage() {
                 { label: "Backend API", healthy: !!health, detail: health ? `v${health.version}` : "Not reachable" },
                 { label: "Database", healthy: !!health, detail: health ? "SQLite (dev)" : "Disconnected" },
                 { label: "Event Bus", healthy: !!health, detail: health ? "Running" : "Offline" },
+                {
+                  label: "Shared Redis",
+                  healthy: !!sharedRedis?.enabled && !!sharedRedis?.available,
+                  detail: sharedRedis
+                    ? sharedRedis.enabled
+                      ? sharedRedis.detail || "Shared resilience enabled"
+                      : "Disabled in this environment"
+                    : "Unknown",
+                },
                 { label: "LangGraph", healthy: true, detail: "Initialized" },
               ].map((s) => (
                 <div key={s.label} className="flex items-center justify-between rounded-md border p-3">
@@ -162,6 +229,51 @@ export default function SettingsPage() {
                   <span className="text-xs text-muted-foreground">{s.detail}</span>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Key className="h-4 w-4" /> Prompt Snapshot
+              </CardTitle>
+              <CardDescription>Versioned prompt registry surfaced by the backend</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <p className="text-sm font-medium">Backend version</p>
+                <span className="text-xs text-muted-foreground">
+                  {versionInfo?.app_version ? `v${versionInfo.app_version}` : "Unknown"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <p className="text-sm font-medium">Prompt registry</p>
+                <span className="text-xs text-muted-foreground">
+                  {versionInfo?.prompt_registry_version || "Unknown"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <p className="text-sm font-medium">Prompt count</p>
+                <span className="text-xs text-muted-foreground">
+                  {typeof versionInfo?.prompt_count === "number" ? versionInfo.prompt_count : promptEntries.length}
+                </span>
+              </div>
+              <div className="rounded-md border bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Prompt versions
+                </p>
+                <div className="space-y-1 font-mono text-xs text-muted-foreground">
+                  {promptEntries.length > 0 ? (
+                    promptEntries.map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between gap-4">
+                        <span>{key}</span>
+                        <span>{value}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p>Version snapshot not loaded yet.</p>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
           <Card>
