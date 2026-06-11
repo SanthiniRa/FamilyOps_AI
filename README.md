@@ -7,8 +7,11 @@ FamilyOps AI is an autonomous household operations platform for email-to-calenda
 - Routes household requests through specialist agents
 - Turns emails into tasks and calendar actions
 - Supports meal planning, recipes, groceries, and reminders
+- Tracks pantry inventory and low-stock alerts
 - Stores family knowledge with retrieval-augmented search
 - Pulls in live web, weather, event, and recipe information
+- Surfaces activity search results with cost, date, time, transport, and travel-time details when the source provides them
+- Renders live search results in structured cards and tables for easier scanning
 - Exposes a FastAPI backend, a Next.js frontend, and evaluation workflows
 
 ## Key Features
@@ -18,11 +21,12 @@ FamilyOps AI is an autonomous household operations platform for email-to-calenda
 | Multi-agent routing | LangGraph-style orchestration for household workflows |
 | Dashboard | Overview of tasks, calendar, groceries, reminders, memory, and activity |
 | Email workflows | Ingests household email and turns it into actionable work |
-| Meal planning | Creates meal plans and recipe suggestions from available context |
+| Meal planning | Creates meal plans and recipe suggestions from available context, with estimated nutrition when recipe metadata is missing |
 | Grocery support | Manages lists and shopping-oriented workflows |
+| Pantry management | Tracks household stock, low inventory, and item usage |
 | Family reminders | Creates and tracks reminders for members of the household |
 | Household memory | Stores and retrieves family knowledge with RAG-backed search |
-| Live utilities | Web search, weather, event, and recipe lookup |
+| Live utilities | Web search, weather, event, activity, and recipe lookup with source allowlists for family activities |
 | Document ingestion | Upload and index documents into the knowledge hub |
 | Observability | Logging, metrics, tracing, and optional Langfuse support |
 
@@ -70,7 +74,7 @@ Data + Infra
 | AI layer | OpenAI primary, Google Gemini fallback | Intent handling, extraction, summarization, and planning |
 | Retrieval | BM25 + dense search + reranking + Qdrant | Household memory and document search |
 | Background jobs | Redis, Celery | Email ingest, processing, and longer-running work |
-| Integrations | Email, weather, events, recipes, web search | External information and household automation inputs |
+| Integrations | Email, weather, events, recipes, pantry, web search | External information and household automation inputs |
 | Observability | Logging, metrics, tracing, Langfuse | Debugging, dashboards, evaluation, and runtime visibility |
 
 ## System Design
@@ -101,9 +105,10 @@ The backend keeps orchestration, retrieval, and integrations in one codebase so 
 1. The user submits a request through the Next.js frontend or the API.
 2. The orchestrator classifies the intent and routes the request to the right workflow.
 3. The workflow may call memory retrieval, web search, weather, event, or recipe services.
-4. Retrieved context is filtered, ranked, and assembled into a response prompt.
-5. The model generates the final answer, and the backend returns it to the UI.
-6. Observability hooks capture logs, metrics, traces, and eval results for later review.
+4. Family activity searches use a family-friendly source allowlist and return structured details when available.
+5. Retrieved context is filtered, ranked, and assembled into a response prompt.
+6. The model generates the final answer, and the backend returns it to the UI.
+7. Observability hooks capture logs, metrics, traces, and eval results for later review.
 
 ### Failure Modes
 
@@ -223,6 +228,11 @@ If you add an approval rule for your own workflow, I’d also keep `Require bran
 | GET/POST | `/api/v1/calendar/events` | Calendar workflows |
 | GET/POST | `/api/v1/grocery` | Grocery workflows |
 | GET/POST | `/api/v1/meals` | Meal planning workflows |
+| GET/POST | `/api/v1/meals/recipes` | Recipe library workflows |
+| GET/POST | `/api/v1/pantry` | Pantry inventory workflows |
+| GET | `/api/v1/pantry/summary` | Pantry summary and counts |
+| GET | `/api/v1/pantry/alerts/low-stock` | Pantry low-stock alerts |
+| GET | `/api/v1/pantry/alerts/expiring` | Pantry expiring-item alerts |
 | GET/POST | `/api/v1/reminders` | Reminder workflows |
 | GET/POST | `/api/v1/memory` | Household memory workflows |
 | GET/POST | `/api/v1/family` | Family member and preference workflows |
@@ -246,8 +256,9 @@ Use prompts like these to trigger the right capability:
 | Meal | `Plan dinners for next week using what we already have` | Meal agent |
 | Recipe | `Find me a quick chicken pasta recipe` | Recipe agent |
 | Weather | `What's the weather in London this weekend?` | Weather agent |
-| Events | `Find family-friendly events near Manchester` | Event agent |
-| Web search | `Look up the latest advice on UK school holiday activities` | Web search agent |
+| Events | `Find family-friendly events near Buckinghamshire` | Event agent |
+| School holidays | `Look up the latest advice on UK school holiday activities` | Event agent |
+| Web search | `Look up the latest advice online` | Web search agent |
 | Reminder | `Remind me to pack the kids' bags on Friday evening` | Reminder agent |
 | Memory | `What did we save about the holiday travel plans?` | Memory agent |
 | Email | `Summarize my latest inbox and turn action items into tasks` | Email agent |
@@ -376,7 +387,6 @@ python -m evaluation.pipeline \
 src/                 Next.js frontend source
 backend/             FastAPI backend, agents, services, workers, docs
 evaluation/          Baseline and live evaluation pipelines
-frontend/            Legacy frontend copy, not used in production
 README.md            Production project readme
 ```
 

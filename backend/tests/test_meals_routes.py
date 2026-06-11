@@ -42,6 +42,18 @@ def _plan(plan_id: str, week_start: datetime):
     )
 
 
+def _recipe(name: str):
+    return SimpleNamespace(
+        id=name.lower(),
+        name=name,
+        nutrition={},
+        ingredients=[
+            {"name": "Chicken breast", "quantity": 2, "unit": "piece", "category": "meat"},
+            {"name": "Rice", "quantity": 1, "unit": "cup", "category": "grains"},
+        ],
+    )
+
+
 def test_list_meal_plans_filters_by_selected_week():
     async def _run():
         selected_week = datetime(2026, 6, 1, tzinfo=timezone.utc)
@@ -63,6 +75,119 @@ def test_list_meal_plans_filters_by_selected_week():
     asyncio.run(_run())
 
 
+def test_list_meal_plans_normalizes_nutrition_summary(monkeypatch):
+    async def _run():
+        week_start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        db = SimpleNamespace(
+            execute=AsyncMock(
+                return_value=FakeResult(
+                    [
+                        SimpleNamespace(
+                            id="plan-1",
+                            week_start=week_start,
+                            week_end=week_start + timedelta(days=6),
+                            meals={},
+                            nutritional_summary={},
+                            result={
+                                "meals": {},
+                                "shopping_list": [],
+                                "nutrition_summary": {"calories": 123, "protein_g": 45},
+                                "estimated_cost": 0,
+                                "budget": None,
+                                "warnings": [],
+                            },
+                            created_at=week_start,
+                            generated_by_ai=True,
+                        )
+                    ]
+                )
+            )
+        )
+
+        plans = await meal_routes.list_meal_plans(db=db)
+
+        summary = plans[0]["nutritional_summary"]
+        assert summary["avg_calories"] == 123
+        assert summary["avg_protein_g"] == 45
+        assert summary["avg_carbs_g"] == 0
+        assert summary["daily_avg_calories"] == 123
+
+    asyncio.run(_run())
+
+
+def test_list_meal_plans_estimates_nutrition_when_summary_missing(monkeypatch):
+    async def _run():
+        week_start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        plan = SimpleNamespace(
+            id="plan-1",
+            week_start=week_start,
+            week_end=week_start + timedelta(days=6),
+            meals={"monday": {"breakfast": "Chicken Rice Bowl"}},
+            nutritional_summary={},
+            result={
+                "meals": {"monday": {"breakfast": "Chicken Rice Bowl"}},
+                "shopping_list": [],
+                "nutrition_summary": {},
+                "estimated_cost": 0,
+                "budget": None,
+                "warnings": [],
+            },
+            created_at=week_start,
+            generated_by_ai=True,
+        )
+
+        db = SimpleNamespace(
+            execute=AsyncMock(
+                side_effect=[
+                    FakeResult([plan]),
+                    FakeResult([_recipe("Chicken Rice Bowl")]),
+                ]
+            )
+        )
+
+        plans = await meal_routes.list_meal_plans(db=db)
+        summary = plans[0]["nutritional_summary"]
+
+        assert summary["avg_calories"] > 0
+        assert summary["avg_protein_g"] > 0
+
+    asyncio.run(_run())
+
+
+def test_list_meal_plans_estimates_nutrition_for_fallback_meals(monkeypatch):
+    async def _run():
+        week_start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        plan = SimpleNamespace(
+            id="plan-1",
+            week_start=week_start,
+            week_end=week_start + timedelta(days=6),
+            meals={"monday": {"breakfast": "Oatmeal with fruit"}},
+            nutritional_summary={},
+            result={
+                "meals": {"monday": {"breakfast": "Oatmeal with fruit"}},
+                "shopping_list": [],
+                "nutrition_summary": {},
+                "estimated_cost": 0,
+                "budget": None,
+                "warnings": [],
+            },
+            created_at=week_start,
+            generated_by_ai=True,
+        )
+
+        db = SimpleNamespace(
+            execute=AsyncMock(return_value=FakeResult([plan]))
+        )
+
+        plans = await meal_routes.list_meal_plans(db=db)
+        summary = plans[0]["nutritional_summary"]
+
+        assert summary["avg_calories"] > 0
+        assert summary["avg_protein_g"] > 0
+
+    asyncio.run(_run())
+
+
 def test_generate_meal_plan_accepts_date_only_week_start(monkeypatch):
     async def _run():
         db = SimpleNamespace(
@@ -74,7 +199,7 @@ def test_generate_meal_plan_accepts_date_only_week_start(monkeypatch):
 
         monkeypatch.setattr(
             meal_routes,
-            "get_household_preferences",
+            "get_household_meal_preferences",
             AsyncMock(return_value={"dietary_restrictions": []}),
         )
         monkeypatch.setattr(

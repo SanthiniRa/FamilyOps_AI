@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, date, time, timezone
 from app.db.database import get_db
 from app.db.models import MealPlan, Recipe
 from app.events.bus import event_bus
+from app.services.family_preferences import get_household_meal_preferences
 
 # -------------------------
 # SAFE PLANNER INIT
@@ -17,6 +18,127 @@ from app.services.meal_planner_service import MealPlanningService
 planner = MealPlanningService()
 
 router = APIRouter(prefix="/meals", tags=["meals"])
+
+
+def _default_nutrition_summary() -> Dict[str, Any]:
+    return {
+        "avg_calories": 0,
+        "avg_protein_g": 0,
+        "avg_carbs_g": 0,
+        "avg_fat_g": 0,
+        "avg_fiber_g": 0,
+        "daily_avg_calories": 0,
+        "daily_avg_protein_g": 0,
+        "daily_avg_carbs_g": 0,
+        "daily_avg_fat_g": 0,
+        "daily_avg_fiber_g": 0,
+    }
+
+
+def _normalize_nutrition_summary(value: Any) -> Dict[str, Any]:
+    if not isinstance(value, dict):
+        return _default_nutrition_summary()
+
+    weekly_average = value.get("weekly_average")
+    source = weekly_average if isinstance(weekly_average, dict) else value
+
+    normalized = _default_nutrition_summary()
+    normalized["avg_calories"] = source.get("avg_calories", source.get("calories", 0)) or 0
+    normalized["avg_protein_g"] = source.get("avg_protein_g", source.get("protein_g", source.get("protein", 0))) or 0
+    normalized["avg_carbs_g"] = source.get("avg_carbs_g", source.get("carbs_g", source.get("carbs", 0))) or 0
+    normalized["avg_fat_g"] = source.get("avg_fat_g", source.get("fat_g", source.get("fat", 0))) or 0
+    normalized["avg_fiber_g"] = source.get("avg_fiber_g", source.get("fiber_g", source.get("fiber", 0))) or 0
+    normalized["daily_avg_calories"] = source.get("daily_avg_calories", normalized["avg_calories"]) or 0
+    normalized["daily_avg_protein_g"] = source.get("daily_avg_protein_g", normalized["avg_protein_g"]) or 0
+    normalized["daily_avg_carbs_g"] = source.get("daily_avg_carbs_g", normalized["avg_carbs_g"]) or 0
+    normalized["daily_avg_fat_g"] = source.get("daily_avg_fat_g", normalized["avg_fat_g"]) or 0
+    normalized["daily_avg_fiber_g"] = source.get("daily_avg_fiber_g", normalized["avg_fiber_g"]) or 0
+    return normalized
+
+
+def _summary_has_values(summary: Dict[str, Any]) -> bool:
+    return any(
+        summary.get(key, 0)
+        for key in (
+            "avg_calories",
+            "avg_protein_g",
+            "avg_carbs_g",
+            "avg_fat_g",
+            "avg_fiber_g",
+            "daily_avg_calories",
+            "daily_avg_protein_g",
+            "daily_avg_carbs_g",
+            "daily_avg_fat_g",
+            "daily_avg_fiber_g",
+        )
+    )
+
+
+async def _resolve_nutrition_summary(db: AsyncSession, meals: Dict[str, Any], stored_summary: Any) -> Dict[str, Any]:
+    normalized = _normalize_nutrition_summary(stored_summary)
+    if _summary_has_values(normalized):
+        return normalized
+
+    meal_names = [
+        str(meal_name).strip()
+        for day_meals in (meals or {}).values()
+        for meal_name in (day_meals or {}).values()
+        if str(meal_name or "").strip()
+    ]
+    if not meal_names:
+        return normalized
+
+    result = await db.execute(
+        select(Recipe).where(Recipe.name.in_(meal_names))
+    )
+    recipes = result.scalars().all()
+    recipe_map = {
+        getattr(r, "name", None): r
+        for r in recipes
+        if getattr(r, "name", None)
+    }
+
+    totals = {
+        "avg_calories": 0,
+        "avg_protein_g": 0,
+        "avg_carbs_g": 0,
+        "avg_fat_g": 0,
+        "avg_fiber_g": 0,
+    }
+    count = 0
+
+    for meal_name in meal_names:
+        recipe = recipe_map.get(meal_name)
+        if recipe:
+            nutrition = recipe.nutrition or {}
+            if not any((nutrition.get("calories"), nutrition.get("protein"), nutrition.get("carbs"), nutrition.get("fat"), nutrition.get("fiber"))):
+                nutrition = planner._estimate_recipe_nutrition(recipe)
+        else:
+            nutrition = planner._estimate_meal_name_nutrition(meal_name)
+
+        totals["avg_calories"] += nutrition.get("calories", 0) or 0
+        totals["avg_protein_g"] += nutrition.get("protein", 0) or 0
+        totals["avg_carbs_g"] += nutrition.get("carbs", 0) or 0
+        totals["avg_fat_g"] += nutrition.get("fat", 0) or 0
+        totals["avg_fiber_g"] += nutrition.get("fiber", 0) or 0
+        count += 1
+
+    if count == 0:
+        return normalized
+
+    estimated = {
+        "avg_calories": round(totals["avg_calories"] / count, 2),
+        "avg_protein_g": round(totals["avg_protein_g"] / count, 2),
+        "avg_carbs_g": round(totals["avg_carbs_g"] / count, 2),
+        "avg_fat_g": round(totals["avg_fat_g"] / count, 2),
+        "avg_fiber_g": round(totals["avg_fiber_g"] / count, 2),
+    }
+    estimated["daily_avg_calories"] = estimated["avg_calories"]
+    estimated["daily_avg_protein_g"] = estimated["avg_protein_g"]
+    estimated["daily_avg_carbs_g"] = estimated["avg_carbs_g"]
+    estimated["daily_avg_fat_g"] = estimated["avg_fat_g"]
+    estimated["daily_avg_fiber_g"] = estimated["avg_fiber_g"]
+    return estimated
 
 
 # ============================================================
@@ -116,6 +238,9 @@ async def list_meal_plans(
     )
     plans = result.scalars().all()
 
+    if not isinstance(week_start, str):
+        week_start = None
+
     if week_start:
         normalized_week_start = _normalize_week_start(week_start)
         plans = [
@@ -131,7 +256,12 @@ async def list_meal_plans(
             "week_end": p.week_end.isoformat() if p.week_end else None,
             "meals": (p.result or {}).get("meals", p.meals or {}),
             "shopping_list": (p.result or {}).get("shopping_list", []),
-            "nutritional_summary": p.nutritional_summary or (p.result or {}).get("nutrition_summary", {}),
+            "nutritional_summary": await _resolve_nutrition_summary(
+                db,
+                (p.result or {}).get("meals", p.meals or {}),
+                p.nutritional_summary or (p.result or {}).get("nutrition_summary", {})
+            ),
+            "weekly_additions": (p.result or {}).get("weekly_additions", []),
             "estimated_cost": (p.result or {}).get("estimated_cost"),
             "budget": (p.result or {}).get("budget"),
             "warnings": (p.result or {}).get("warnings", []),
@@ -172,7 +302,7 @@ async def generate_meal_plan(
     week_end = week_start + timedelta(days=6)
 
     # 1. preferences
-    prefs = await get_household_preferences(db)
+    prefs = await get_household_meal_preferences(db)
 
     # 2. AI planner (SAFE)
     try:
@@ -193,7 +323,7 @@ async def generate_meal_plan(
     # 3. SAFE OUTPUT NORMALIZATION (CRITICAL)
     meals = result.get("meals", {})
     shopping_list = result.get("shopping_list", [])
-    nutrition = result.get("nutrition_summary", {})
+    nutrition = _normalize_nutrition_summary(result.get("nutrition_summary", {}))
     cost = result.get("estimated_cost", None)
     warnings = result.get("warnings", [])
 
@@ -238,6 +368,7 @@ async def generate_meal_plan(
         "meals": meals,
         "shopping_list": shopping_list,
         "nutritional_summary": nutrition,
+        "weekly_additions": result.get("weekly_additions", []),
         "estimated_cost": cost,
         "budget": data.budget,
         "over_budget": result.get("over_budget", False),
@@ -267,7 +398,12 @@ async def get_meal_plan(plan_id: str, db: AsyncSession = Depends(get_db)):
         "week_end": plan.week_end.isoformat() if plan.week_end else None,
         "meals": (plan.result or {}).get("meals", plan.meals or {}),
         "shopping_list": (plan.result or {}).get("shopping_list", []),
-        "nutritional_summary": plan.nutritional_summary or (plan.result or {}).get("nutrition_summary", {}),
+        "nutritional_summary": await _resolve_nutrition_summary(
+            db,
+            (plan.result or {}).get("meals", plan.meals or {}),
+            plan.nutritional_summary or (plan.result or {}).get("nutrition_summary", {})
+        ),
+        "weekly_additions": (plan.result or {}).get("weekly_additions", []),
         "estimated_cost": (plan.result or {}).get("estimated_cost"),
         "budget": (plan.result or {}).get("budget"),
         "warnings": (plan.result or {}).get("warnings", []),

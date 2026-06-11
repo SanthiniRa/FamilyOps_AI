@@ -1,7 +1,5 @@
 node_modules
 .next
-frontend/node_modules
-frontend/.next
 backend
 frontend
 evaluation

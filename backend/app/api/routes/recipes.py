@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -14,6 +14,7 @@ class RecipeSearchRequest(BaseModel):
     query: str = Field(..., min_length=1)
     max_results: int = Field(default=10, ge=1, le=20)
     ingredient: Optional[str] = None
+    ingredients: List[str] = Field(default_factory=list)
     category: Optional[str] = None
 
 
@@ -23,5 +24,6 @@ async def search_recipes(request: RecipeSearchRequest):
         request.query,
         max_results=request.max_results,
         ingredient=request.ingredient,
+        ingredients=request.ingredients,
         category=request.category,
     )

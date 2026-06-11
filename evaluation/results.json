@@ -11,7 +11,7 @@
   },
   "total_cases": 40,
   "pass_threshold": 0.8,
-  "final_score": 0.9291878704108407,
+  "final_score": 0.929145876352719,
   "rag_quality": 0.6805089756125167,
   "rag_metrics": {
     "context_precision": 0.5666666666666667,
@@ -27,9 +27,9 @@
   "routing_accuracy": 1.0,
   "estimated_tokens": 56.675,
   "estimated_cost_units": 0.056675,
-  "latency_ms": 4.745530500167661,
-  "retrieval_latency_ms": 4.364772500230174,
-  "generation_latency_ms": 0.38005069986866147,
+  "latency_ms": 7.702755300010722,
+  "retrieval_latency_ms": 7.184314525011359,
+  "generation_latency_ms": 0.5173587000626867,
   "passed": true,
   "cases": [
     {
@@ -71,9 +71,9 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 68,
       "estimated_cost_units": 0.068,
-      "latency_ms": 12.94214299923624,
-      "retrieval_latency_ms": 9.895228999084793,
-      "generation_latency_ms": 3.044152001166367,
+      "latency_ms": 41.65126800035068,
+      "retrieval_latency_ms": 32.98427699974127,
+      "generation_latency_ms": 8.663837000312924,
       "error_message": null,
       "final_score": 1.0
     },
@@ -116,11 +116,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 63,
       "estimated_cost_units": 0.063,
-      "latency_ms": 6.459111000367557,
-      "retrieval_latency_ms": 6.414483999833465,
-      "generation_latency_ms": 0.043480000385898165,
+      "latency_ms": 19.33167900006083,
+      "retrieval_latency_ms": 19.24204000079044,
+      "generation_latency_ms": 0.08759299998928327,
       "error_message": null,
-      "final_score": 0.9617569814162308
+      "final_score": 0.9615156207662365
     },
     {
       "case_id": "email_calendar_03",
@@ -161,11 +161,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 63,
       "estimated_cost_units": 0.063,
-      "latency_ms": 4.275003000657307,
-      "retrieval_latency_ms": 4.235161000906373,
-      "generation_latency_ms": 0.03912899956048932,
+      "latency_ms": 17.841525999756414,
+      "retrieval_latency_ms": 17.76616200004355,
+      "generation_latency_ms": 0.07383499996649334,
       "error_message": null,
-      "final_score": 0.9967407579343248
+      "final_score": 0.9964863856280917
     },
     {
       "case_id": "email_calendar_04",
@@ -206,11 +206,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 77,
       "estimated_cost_units": 0.077,
-      "latency_ms": 4.750783000417869,
-      "retrieval_latency_ms": 4.715054999905988,
-      "generation_latency_ms": 0.03517100049066357,
+      "latency_ms": 13.96110400037287,
+      "retrieval_latency_ms": 13.88844400025846,
+      "generation_latency_ms": 0.0711800003045937,
       "error_message": null,
-      "final_score": 0.9704325664043892
+      "final_score": 0.9702598728856401
     },
     {
       "case_id": "email_calendar_05",
@@ -251,11 +251,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 55,
       "estimated_cost_units": 0.055,
-      "latency_ms": 4.154141999606509,
-      "retrieval_latency_ms": 4.124078999666381,
-      "generation_latency_ms": 0.02943900108220987,
+      "latency_ms": 9.180132999972557,
+      "retrieval_latency_ms": 9.118009000303573,
+      "generation_latency_ms": 0.06051499985915143,
       "error_message": null,
-      "final_score": 0.9796435043163515
+      "final_score": 0.9795492669850947
     },
     {
       "case_id": "email_calendar_06",
@@ -296,11 +296,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 59,
       "estimated_cost_units": 0.059,
-      "latency_ms": 4.576313000143273,
-      "retrieval_latency_ms": 4.5395650013233535,
-      "generation_latency_ms": 0.03622799886215944,
+      "latency_ms": 18.67419699919992,
+      "retrieval_latency_ms": 18.598147999909997,
+      "generation_latency_ms": 0.07478600036847638,
       "error_message": null,
-      "final_score": 0.9687649327519485
+      "final_score": 0.9685005974269661
     },
     {
       "case_id": "email_calendar_07",
@@ -341,11 +341,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 47,
       "estimated_cost_units": 0.047,
-      "latency_ms": 4.522664999967674,
-      "retrieval_latency_ms": 4.107029999431688,
-      "generation_latency_ms": 0.41484900066279806,
+      "latency_ms": 8.995512999717903,
+      "retrieval_latency_ms": 8.338387000549119,
+      "generation_latency_ms": 0.6554049996339018,
       "error_message": null,
-      "final_score": 0.9949121412770614
+      "final_score": 0.9948282753770661
     },
     {
       "case_id": "email_calendar_08",
@@ -386,11 +386,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 55,
       "estimated_cost_units": 0.055,
-      "latency_ms": 4.147821999140433,
-      "retrieval_latency_ms": 4.115658000955591,
-      "generation_latency_ms": 0.03177700091328006,
+      "latency_ms": 6.984725000620529,
+      "retrieval_latency_ms": 6.920077999893692,
+      "generation_latency_ms": 0.06330300038825953,
       "error_message": null,
-      "final_score": 0.985000702923553
+      "final_score": 0.9849475109922752
     },
     {
       "case_id": "email_calendar_09",
@@ -431,11 +431,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 50,
       "estimated_cost_units": 0.05,
-      "latency_ms": 4.36071100011759,
-      "retrieval_latency_ms": 4.32585199996538,
-      "generation_latency_ms": 0.03431100049056113,
+      "latency_ms": 5.197933000090416,
+      "retrieval_latency_ms": 5.155290999937279,
+      "generation_latency_ms": 0.04145899947616272,
       "error_message": null,
-      "final_score": 0.9752343916395079
+      "final_score": 0.9752186937270084
     },
     {
       "case_id": "email_calendar_10",
@@ -476,11 +476,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 58,
       "estimated_cost_units": 0.058,
-      "latency_ms": 4.53324599948246,
-      "retrieval_latency_ms": 4.500568000366911,
-      "generation_latency_ms": 0.032248999559669755,
+      "latency_ms": 4.757904999678431,
+      "retrieval_latency_ms": 4.718367000350554,
+      "generation_latency_ms": 0.0388490007026121,
       "error_message": null,
-      "final_score": 0.97182334354001
+      "final_score": 0.9718191311837563
     },
     {
       "case_id": "meal_planning_01",
@@ -521,11 +521,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 57,
       "estimated_cost_units": 0.057,
-      "latency_ms": 10.951064001346822,
-      "retrieval_latency_ms": 8.360006999282632,
-      "generation_latency_ms": 2.5897949999489356,
+      "latency_ms": 7.9990040003394824,
+      "retrieval_latency_ms": 6.621086000450305,
+      "generation_latency_ms": 1.3770730001851916,
       "error_message": null,
-      "final_score": 0.9548259593446126
+      "final_score": 0.9548813104696314
     },
     {
       "case_id": "meal_planning_02",
@@ -566,11 +566,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 69,
       "estimated_cost_units": 0.069,
-      "latency_ms": 5.293723999784561,
-      "retrieval_latency_ms": 4.590612999891164,
-      "generation_latency_ms": 0.7023119997029426,
+      "latency_ms": 5.960713999229483,
+      "retrieval_latency_ms": 4.57464400005847,
+      "generation_latency_ms": 1.3849229999323143,
       "error_message": null,
-      "final_score": 0.8944676889765241
+      "final_score": 0.8944551829140345
     },
     {
       "case_id": "meal_planning_03",
@@ -611,11 +611,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 69,
       "estimated_cost_units": 0.069,
-      "latency_ms": 5.244863999905647,
-      "retrieval_latency_ms": 4.459039000721532,
-      "generation_latency_ms": 0.785284999437863,
+      "latency_ms": 5.223662000389595,
+      "retrieval_latency_ms": 4.440832999534905,
+      "generation_latency_ms": 0.7817619998604641,
       "error_message": null,
-      "final_score": 0.9453017611895193
+      "final_score": 0.9453021587270102
     },
     {
       "case_id": "meal_planning_04",
@@ -656,11 +656,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 57,
       "estimated_cost_units": 0.057,
-      "latency_ms": 4.55892500031041,
-      "retrieval_latency_ms": 4.0121140009432565,
-      "generation_latency_ms": 0.5461279997689417,
+      "latency_ms": 8.249449999311764,
+      "retrieval_latency_ms": 7.344490999457776,
+      "generation_latency_ms": 0.9036310002557002,
       "error_message": null,
-      "final_score": 0.9608607499478834
+      "final_score": 0.960791552604152
     },
     {
       "case_id": "meal_planning_05",
@@ -701,11 +701,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 65,
       "estimated_cost_units": 0.065,
-      "latency_ms": 4.939589000059641,
-      "retrieval_latency_ms": 4.3122009992657695,
-      "generation_latency_ms": 0.6268590004765429,
+      "latency_ms": 7.557772999462031,
+      "retrieval_latency_ms": 6.550195999807329,
+      "generation_latency_ms": 1.0063879999506753,
       "error_message": null,
-      "final_score": 0.9601307151574298
+      "final_score": 0.960081624207441
     },
     {
       "case_id": "meal_planning_06",
@@ -746,11 +746,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 64,
       "estimated_cost_units": 0.064,
-      "latency_ms": 5.106990000058431,
-      "retrieval_latency_ms": 4.488642000069376,
-      "generation_latency_ms": 0.617590998444939,
+      "latency_ms": 6.92834799974662,
+      "retrieval_latency_ms": 6.284023999796773,
+      "generation_latency_ms": 0.6429160002880963,
       "error_message": null,
-      "final_score": 0.9618692926309395
+      "final_score": 0.9618351421684452
     },
     {
       "case_id": "meal_planning_07",
@@ -791,11 +791,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 66,
       "estimated_cost_units": 0.066,
-      "latency_ms": 4.767938999066246,
-      "retrieval_latency_ms": 4.109376000997145,
-      "generation_latency_ms": 0.6581069992535049,
+      "latency_ms": 4.771836000145413,
+      "retrieval_latency_ms": 4.10549699972762,
+      "generation_latency_ms": 0.6655899996985681,
       "error_message": null,
-      "final_score": 0.9547976417189575
+      "final_score": 0.9547975686501874
     },
     {
       "case_id": "meal_planning_08",
@@ -836,11 +836,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 71,
       "estimated_cost_units": 0.071,
-      "latency_ms": 5.767559001469635,
-      "retrieval_latency_ms": 5.008269001336885,
-      "generation_latency_ms": 0.7584649993077619,
+      "latency_ms": 5.716132000088692,
+      "retrieval_latency_ms": 4.949039000166522,
+      "generation_latency_ms": 0.7664049999220879,
       "error_message": null,
-      "final_score": 0.9350110717884955
+      "final_score": 0.9350120360447713
     },
     {
       "case_id": "meal_planning_09",
@@ -881,11 +881,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 68,
       "estimated_cost_units": 0.068,
-      "latency_ms": 6.060026000341168,
-      "retrieval_latency_ms": 5.035721000240301,
-      "generation_latency_ms": 1.0232619988528313,
+      "latency_ms": 4.907855999590538,
+      "retrieval_latency_ms": 4.358914000476943,
+      "generation_latency_ms": 0.5482340002345154,
       "error_message": null,
-      "final_score": 0.9418265381749165
+      "final_score": 0.9418481413624306
     },
     {
       "case_id": "meal_planning_10",
@@ -926,11 +926,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 72,
       "estimated_cost_units": 0.072,
-      "latency_ms": 9.279863001211197,
-      "retrieval_latency_ms": 8.11739500022668,
-      "generation_latency_ms": 1.161035999757587,
+      "latency_ms": 6.9661729994550114,
+      "retrieval_latency_ms": 6.381923999470018,
+      "generation_latency_ms": 0.5832550004924997,
       "error_message": null,
-      "final_score": 0.9779824263627541
+      "final_score": 0.978025808050287
     },
     {
       "case_id": "memory_lookup_01",
@@ -971,11 +971,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 49,
       "estimated_cost_units": 0.049,
-      "latency_ms": 3.920084000128554,
-      "retrieval_latency_ms": 3.2391600016126176,
-      "generation_latency_ms": 0.6798609992983984,
+      "latency_ms": 3.7551830000666087,
+      "retrieval_latency_ms": 3.0958200004533865,
+      "generation_latency_ms": 0.658519000353408,
       "error_message": null,
-      "final_score": 0.9942258348504992
+      "final_score": 0.9942289267442505
     },
     {
       "case_id": "memory_lookup_02",
@@ -1016,9 +1016,9 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 43,
       "estimated_cost_units": 0.043,
-      "latency_ms": 3.1224800004565623,
-      "retrieval_latency_ms": 3.0126630008453503,
-      "generation_latency_ms": 0.10928400115517434,
+      "latency_ms": 3.1707560001450474,
+      "retrieval_latency_ms": 3.044295000108832,
+      "generation_latency_ms": 0.1257780004380038,
       "error_message": null,
       "final_score": 1.0
     },
@@ -1061,11 +1061,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 48,
       "estimated_cost_units": 0.048,
-      "latency_ms": 4.285901000912418,
-      "retrieval_latency_ms": 4.259220000676578,
-      "generation_latency_ms": 0.026243998945574276,
+      "latency_ms": 4.403936000016984,
+      "retrieval_latency_ms": 4.365933000372024,
+      "generation_latency_ms": 0.037275000067893416,
       "error_message": null,
-      "final_score": 0.8261395778603432
+      "final_score": 0.8261373647041099
     },
     {
       "case_id": "memory_lookup_04",
@@ -1106,9 +1106,9 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 55,
       "estimated_cost_units": 0.055,
-      "latency_ms": 3.9103460003389046,
-      "retrieval_latency_ms": 3.8859140004205983,
-      "generation_latency_ms": 0.02395200135651976,
+      "latency_ms": 3.8546129999303957,
+      "retrieval_latency_ms": 3.831428000012238,
+      "generation_latency_ms": 0.022667999473924283,
       "error_message": null,
       "final_score": 1.0
     },
@@ -1151,11 +1151,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 40,
       "estimated_cost_units": 0.04,
-      "latency_ms": 3.655702999822097,
-      "retrieval_latency_ms": 3.6411510009202175,
-      "generation_latency_ms": 0.014163999367156066,
+      "latency_ms": 6.283364000410074,
+      "retrieval_latency_ms": 6.254140000237385,
+      "generation_latency_ms": 0.02839799981302349,
       "error_message": null,
-      "final_score": 0.9641015781375549
+      "final_score": 0.9640523094937938
     },
     {
       "case_id": "memory_lookup_06",
@@ -1196,11 +1196,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 49,
       "estimated_cost_units": 0.049,
-      "latency_ms": 4.011221000837395,
-      "retrieval_latency_ms": 3.986553998402087,
-      "generation_latency_ms": 0.024118999135680497,
+      "latency_ms": 8.269290000498586,
+      "retrieval_latency_ms": 8.21023300068191,
+      "generation_latency_ms": 0.0576960001126281,
       "error_message": null,
-      "final_score": 0.9868493359146613
+      "final_score": 0.9867694971209177
     },
     {
       "case_id": "memory_lookup_07",
@@ -1241,11 +1241,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 46,
       "estimated_cost_units": 0.046,
-      "latency_ms": 3.3561520012881374,
-      "retrieval_latency_ms": 3.337227999509196,
-      "generation_latency_ms": 0.018425998860038817,
+      "latency_ms": 17.866848999801732,
+      "retrieval_latency_ms": 17.82241000000795,
+      "generation_latency_ms": 0.04303199966670945,
       "error_message": null,
-      "final_score": 0.9814709307219145
+      "final_score": 0.9811988551531924
     },
     {
       "case_id": "memory_lookup_08",
@@ -1286,11 +1286,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 50,
       "estimated_cost_units": 0.05,
-      "latency_ms": 3.3476280004833825,
-      "retrieval_latency_ms": 3.331276000608341,
-      "generation_latency_ms": 0.01596000038261991,
+      "latency_ms": 3.455009000390419,
+      "retrieval_latency_ms": 3.4293959997739876,
+      "generation_latency_ms": 0.024771999960648827,
       "error_message": null,
-      "final_score": 0.9536244879051723
+      "final_score": 0.953622474511424
     },
     {
       "case_id": "memory_lookup_09",
@@ -1331,11 +1331,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 33,
       "estimated_cost_units": 0.033,
-      "latency_ms": 3.3357949996570824,
-      "retrieval_latency_ms": 3.3037850007531233,
-      "generation_latency_ms": 0.03136899977107532,
+      "latency_ms": 3.304897000816709,
+      "retrieval_latency_ms": 3.28196900045441,
+      "generation_latency_ms": 0.02243899962195428,
       "error_message": null,
-      "final_score": 0.9509655788437563
+      "final_score": 0.9509661581812346
     },
     {
       "case_id": "memory_lookup_10",
@@ -1376,11 +1376,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 38,
       "estimated_cost_units": 0.038,
-      "latency_ms": 3.505067999867606,
-      "retrieval_latency_ms": 3.4849179992306745,
-      "generation_latency_ms": 0.01975299892365001,
+      "latency_ms": 4.55881300058536,
+      "retrieval_latency_ms": 4.52761099950294,
+      "generation_latency_ms": 0.029767999876639806,
       "error_message": null,
-      "final_score": 0.9748447147816729
+      "final_score": 0.9748249570629095
     },
     {
       "case_id": "general_chat_01",
@@ -1421,11 +1421,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 58,
       "estimated_cost_units": 0.058,
-      "latency_ms": 7.5111789992661215,
-      "retrieval_latency_ms": 6.736452000041027,
-      "generation_latency_ms": 0.773808998928871,
+      "latency_ms": 7.109335999302857,
+      "retrieval_latency_ms": 6.241312000383914,
+      "generation_latency_ms": 0.866432000293571,
       "error_message": null,
-      "final_score": 0.8324753957974783
+      "final_score": 0.8324829303537276
     },
     {
       "case_id": "general_chat_02",
@@ -1466,11 +1466,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 54,
       "estimated_cost_units": 0.054,
-      "latency_ms": 3.888356999595999,
-      "retrieval_latency_ms": 3.8606289999734145,
-      "generation_latency_ms": 0.02665699867065996,
+      "latency_ms": 4.274849000466929,
+      "retrieval_latency_ms": 4.248924999956216,
+      "generation_latency_ms": 0.024776000827841926,
       "error_message": null,
-      "final_score": 0.7666318356763603
+      "final_score": 0.766624588951344
     },
     {
       "case_id": "general_chat_03",
@@ -1511,11 +1511,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 51,
       "estimated_cost_units": 0.051,
-      "latency_ms": 2.991027999087237,
-      "retrieval_latency_ms": 2.9721470000367844,
-      "generation_latency_ms": 0.018349999663769267,
+      "latency_ms": 2.9910809998909826,
+      "retrieval_latency_ms": 2.971785999761778,
+      "generation_latency_ms": 0.018407000425213482,
       "error_message": null,
-      "final_score": 0.7943342699293833
+      "final_score": 0.7943342689356182
     },
     {
       "case_id": "general_chat_04",
@@ -1556,11 +1556,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 56,
       "estimated_cost_units": 0.056,
-      "latency_ms": 3.2971000000543427,
-      "retrieval_latency_ms": 3.281032000813866,
-      "generation_latency_ms": 0.015673000234528445,
+      "latency_ms": 3.2814930000313325,
+      "retrieval_latency_ms": 3.2648309997966862,
+      "generation_latency_ms": 0.016254999536613468,
       "error_message": null,
-      "final_score": 0.9171081131268781
+      "final_score": 0.9171084057581285
     },
     {
       "case_id": "general_chat_05",
@@ -1601,11 +1601,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 59,
       "estimated_cost_units": 0.059,
-      "latency_ms": 2.988999000081094,
-      "retrieval_latency_ms": 2.9732639995927457,
-      "generation_latency_ms": 0.015265999536495656,
+      "latency_ms": 2.9548630000135745,
+      "retrieval_latency_ms": 2.9342629995880998,
+      "generation_latency_ms": 0.019918999896617606,
       "error_message": null,
-      "final_score": 0.8482282301740383
+      "final_score": 0.8482288702240395
     },
     {
       "case_id": "general_chat_06",
@@ -1646,11 +1646,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 52,
       "estimated_cost_units": 0.052,
-      "latency_ms": 3.311810000013793,
-      "retrieval_latency_ms": 3.2971500004350673,
-      "generation_latency_ms": 0.014083001588005573,
+      "latency_ms": 3.3437259999118396,
+      "retrieval_latency_ms": 3.3247039991692873,
+      "generation_latency_ms": 0.018356000509811565,
       "error_message": null,
-      "final_score": 0.7584075112460898
+      "final_score": 0.7584069128210917
     },
     {
       "case_id": "general_chat_07",
@@ -1691,11 +1691,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 59,
       "estimated_cost_units": 0.059,
-      "latency_ms": 3.6694840000564,
-      "retrieval_latency_ms": 3.5542500008887146,
-      "generation_latency_ms": 0.11470099889265839,
+      "latency_ms": 3.5984630003440543,
+      "retrieval_latency_ms": 3.4845359996324987,
+      "generation_latency_ms": 0.11348899988661287,
       "error_message": null,
-      "final_score": 0.8233344024689813
+      "final_score": 0.8233357341127259
     },
     {
       "case_id": "general_chat_08",
@@ -1736,11 +1736,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 58,
       "estimated_cost_units": 0.058,
-      "latency_ms": 3.189154000210692,
-      "retrieval_latency_ms": 3.172681999785709,
-      "generation_latency_ms": 0.01594500099599827,
+      "latency_ms": 3.1529289999525645,
+      "retrieval_latency_ms": 3.136119000373583,
+      "generation_latency_ms": 0.016365999726986047,
       "error_message": null,
-      "final_score": 0.8095133912590965
+      "final_score": 0.8095140704778513
     },
     {
       "case_id": "general_chat_09",
@@ -1781,11 +1781,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 57,
       "estimated_cost_units": 0.057,
-      "latency_ms": 2.838972000972717,
-      "retrieval_latency_ms": 2.8223770004842663,
-      "generation_latency_ms": 0.01614199936739169,
+      "latency_ms": 2.7998670002489234,
+      "retrieval_latency_ms": 2.7774999998655403,
+      "generation_latency_ms": 0.02166699960071128,
       "error_message": null,
-      "final_score": 0.9289483908378985
+      "final_score": 0.9289491240566621
     },
     {
       "case_id": "general_chat_10",
@@ -1826,11 +1826,11 @@
       "routing_accuracy": 1.0,
       "estimated_tokens": 59,
       "estimated_cost_units": 0.059,
-      "latency_ms": 2.992277000885224,
-      "retrieval_latency_ms": 2.9729899997619214,
-      "generation_latency_ms": 0.01864500154624693,
+      "latency_ms": 4.823964000024716,
+      "retrieval_latency_ms": 4.785518999597116,
+      "generation_latency_ms": 0.03739700059668394,
       "error_message": null,
-      "final_score": 0.7649280694064428
+      "final_score": 0.7648937252752088
     }
   ],
   "meta": {

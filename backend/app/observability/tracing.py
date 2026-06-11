@@ -53,8 +53,37 @@ class TraceSpan:
         )
 
 
+class AgentTracer:
+    """
+    Compatibility wrapper for agent code that expects start/finish hooks.
+    """
+
+    def start(self, name: str, input_text: str, metadata: Optional[Dict[str, Any]] = None):
+        span = tracer.trace(name, metadata=metadata or {})
+        span.__enter__()
+        logger.info(
+            "agent.trace.start",
+            trace_id=span.id,
+            name=name,
+            input=input_text,
+            **(metadata or {}),
+        )
+        return span
+
+    def finish(self, trace: TraceSpan, output: Optional[str] = None, error: Optional[str] = None):
+        logger.info(
+            "agent.trace.finish",
+            trace_id=getattr(trace, "id", None),
+            name=getattr(trace, "name", None),
+            output=output,
+            error=error,
+        )
+        trace.__exit__(None, None, None)
+
+
 # ============================================================
-# GLOBAL TRACER (THIS FIXES YOUR IMPORT ERROR)
+# GLOBAL TRACERS
 # ============================================================
 
 tracer = Tracer()
+agent_tracer = AgentTracer()

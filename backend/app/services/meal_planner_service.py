@@ -39,20 +39,15 @@ class MealPlanningService:
             warnings.append("No recipes found in the database; generated a fallback meal plan.")
             meals = self._build_fallback_meals(preferences, week_start)
 
-        grocery_list = self._build_grocery_list(meals, recipes, pantry) if recipes else []
+        weekly_additions = self._build_weekly_additions(preferences)
+        if weekly_additions:
+            meals = self._apply_weekly_additions(meals, weekly_additions)
 
-        nutrition = self._calculate_nutrition(recipes, meals) if recipes else {
-            "avg_calories": 0,
-            "avg_protein_g": 0,
-            "avg_carbs_g": 0,
-            "avg_fat_g": 0,
-            "avg_fiber_g": 0,
-            "daily_avg_calories": 0,
-            "daily_avg_protein_g": 0,
-            "daily_avg_carbs_g": 0,
-            "daily_avg_fat_g": 0,
-            "daily_avg_fiber_g": 0,
-        }
+        grocery_list = self._build_grocery_list(meals, recipes, pantry) if recipes else []
+        if weekly_additions:
+            grocery_list = self._merge_grocery_items(grocery_list, weekly_additions)
+
+        nutrition = self._calculate_nutrition(recipes, meals)
 
         cost = self._estimate_cost(grocery_list)
 
@@ -63,6 +58,7 @@ class MealPlanningService:
             "estimated_cost": cost,
             "over_budget": budget is not None and cost > budget,
             "warnings": warnings,
+            "weekly_additions": weekly_additions,
         }
 
     # ================================
@@ -221,6 +217,79 @@ class MealPlanningService:
                 "dinner": dinner_options[idx % len(dinner_options)],
             }
         return meals
+
+    def _build_weekly_additions(self, preferences):
+        additions = []
+        seen: set[str] = set()
+        for item in preferences.get("planned_additions", []) or []:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            normalized = self._normalize_name(name)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            additions.append(
+                {
+                    "name": name,
+                    "quantity": item.get("quantity", 1) or 1,
+                    "unit": item.get("unit", "item") or "item",
+                    "category": item.get("category", "Snacks") or "Snacks",
+                    "price_estimate": item.get("price_estimate", 0) or 0,
+                    "notes": item.get("notes"),
+                    "source": item.get("source", "memory"),
+                    "day": item.get("day"),
+                }
+            )
+        return additions
+
+    def _apply_weekly_additions(self, meals, weekly_additions):
+        enriched = {day: dict(day_meals or {}) for day, day_meals in (meals or {}).items()}
+        for addition in weekly_additions or []:
+            day = str(addition.get("day") or "").strip().lower()
+            name = str(addition.get("name") or "").strip()
+            if not day or not name:
+                continue
+            day_meals = enriched.setdefault(day, {})
+            existing = day_meals.get("snack")
+            if existing:
+                if name.lower() not in existing.lower():
+                    day_meals["snack"] = f"{existing} / {name}"
+            else:
+                day_meals["snack"] = name
+        return enriched
+
+    def _merge_grocery_items(self, grocery_list, weekly_additions):
+        merged = list(grocery_list or [])
+        seen = {
+            self._normalize_name(str(item.get("name") or ""))
+            for item in merged
+            if str(item.get("name") or "").strip()
+        }
+
+        for addition in weekly_additions or []:
+            name = str(addition.get("name") or "").strip()
+            if not name:
+                continue
+            normalized = self._normalize_name(name)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            merged.append(
+                {
+                    "name": name,
+                    "quantity": addition.get("quantity", 1) or 1,
+                    "unit": addition.get("unit", "item") or "item",
+                    "category": addition.get("category", "Snacks") or "Snacks",
+                    "price_estimate": addition.get("price_estimate", 0) or 0,
+                    "notes": addition.get("notes"),
+                    "source": addition.get("source", "memory"),
+                }
+            )
+
+        return merged
 
     # ================================
     # OPTIONAL LLM SELECTION
@@ -381,12 +450,13 @@ class MealPlanningService:
 
         for day in meals.values():
             for meal in day.values():
-
                 r = recipe_map.get(meal)
-                if not r:
-                    continue
-
-                n = r.nutrition or {}
+                if r:
+                    n = r.nutrition or {}
+                    if not any((n.get("calories"), n.get("protein"), n.get("carbs"), n.get("fat"), n.get("fiber"))):
+                        n = self._estimate_recipe_nutrition(r)
+                else:
+                    n = self._estimate_meal_name_nutrition(str(meal or ""))
 
                 total["calories"] += n.get("calories", 0)
                 total["protein"] += n.get("protein", 0)
@@ -429,6 +499,137 @@ class MealPlanningService:
             "daily_avg_fiber_g": avg_fiber_g,
         }
 
+    def _estimate_recipe_nutrition(self, recipe):
+        ingredients = recipe.ingredients or []
+        name = self._normalize_name(getattr(recipe, "name", ""))
+        servings = getattr(recipe, "servings", None) or 4
+        servings = max(1, int(servings))
+
+        total_calories = 0
+        protein = 0
+        carbs = 0
+        fat = 0
+        fiber = 0
+
+        for ingredient in ingredients:
+            ingredient_name = self._normalize_name(str((ingredient or {}).get("name", "")))
+            quantity = ingredient.get("quantity", 1) if isinstance(ingredient, dict) else 1
+            quantity = quantity if isinstance(quantity, (int, float)) and quantity > 0 else 1
+
+            ingredient_calories = 60
+            ingredient_protein = 2
+            ingredient_carbs = 6
+            ingredient_fat = 2
+            ingredient_fiber = 1
+
+            if any(term in ingredient_name for term in ["chicken", "beef", "pork", "turkey", "fish", "salmon", "tuna", "egg"]):
+                ingredient_calories = 140
+                ingredient_protein = 14
+                ingredient_carbs = 1
+                ingredient_fat = 8
+            elif any(term in ingredient_name for term in ["rice", "pasta", "bread", "noodle", "potato", "oat", "flour", "tortilla"]):
+                ingredient_calories = 110
+                ingredient_protein = 3
+                ingredient_carbs = 22
+                ingredient_fat = 1
+                ingredient_fiber = 2
+            elif any(term in ingredient_name for term in ["milk", "cheese", "yogurt", "butter", "cream"]):
+                ingredient_calories = 90
+                ingredient_protein = 5
+                ingredient_carbs = 4
+                ingredient_fat = 6
+            elif any(term in ingredient_name for term in ["beans", "lentil", "chickpea", "peas"]):
+                ingredient_calories = 100
+                ingredient_protein = 6
+                ingredient_carbs = 14
+                ingredient_fat = 1
+                ingredient_fiber = 4
+            elif any(term in ingredient_name for term in ["cake", "cookie", "brownie", "dessert", "ice cream"]):
+                ingredient_calories = 180
+                ingredient_protein = 2
+                ingredient_carbs = 24
+                ingredient_fat = 8
+            elif any(term in ingredient_name for term in ["oil", "butter", "margarine", "cream"]):
+                ingredient_calories = 120
+                ingredient_protein = 0
+                ingredient_carbs = 0
+                ingredient_fat = 14
+
+            total_calories += ingredient_calories * quantity
+            protein += ingredient_protein * quantity
+            carbs += ingredient_carbs * quantity
+            fat += ingredient_fat * quantity
+            fiber += ingredient_fiber * quantity
+
+        if not ingredients:
+            base = 350
+            if any(term in name for term in ["salad", "soup", "stew"]):
+                base = 220
+            elif any(term in name for term in ["breakfast", "oat", "porridge", "toast"]):
+                base = 280
+            elif any(term in name for term in ["cake", "cookie", "dessert", "brownie"]):
+                base = 260
+            total_calories = base
+            protein = 12
+            carbs = 30
+            fat = 12
+            fiber = 4
+
+        return {
+            "calories": round(total_calories / servings, 2),
+            "protein": round(protein / servings, 2),
+            "carbs": round(carbs / servings, 2),
+            "fat": round(fat / servings, 2),
+            "fiber": round(fiber / servings, 2),
+        }
+
+    def _estimate_meal_name_nutrition(self, meal_name: str):
+        name = self._normalize_name(meal_name)
+        base = 320
+        protein = 10
+        carbs = 35
+        fat = 12
+        fiber = 4
+
+        if any(term in name for term in ["salad", "soup", "stew", "broth"]):
+            base = 220
+            protein = 8
+            carbs = 18
+            fat = 8
+            fiber = 5
+        elif any(term in name for term in ["breakfast", "oat", "porridge", "toast", "cereal", "yogurt"]):
+            base = 280
+            protein = 9
+            carbs = 32
+            fat = 10
+            fiber = 5
+        elif any(term in name for term in ["pasta", "rice", "bowl", "wrap", "sandwich", "taco", "pizza"]):
+            base = 380
+            protein = 14
+            carbs = 42
+            fat = 14
+            fiber = 5
+        elif any(term in name for term in ["cake", "cookie", "brownie", "dessert", "ice cream", "treat", "sweet"]):
+            base = 260
+            protein = 3
+            carbs = 34
+            fat = 11
+            fiber = 2
+        elif any(term in name for term in ["fish", "salmon", "chicken", "beef", "turkey", "egg", "omelette", "omelet"]):
+            base = 420
+            protein = 28
+            carbs = 12
+            fat = 18
+            fiber = 3
+
+        return {
+            "calories": base,
+            "protein": protein,
+            "carbs": carbs,
+            "fat": fat,
+            "fiber": fiber,
+        }
+
     # ================================
     # COST ENGINE
     # ================================
@@ -437,3 +638,6 @@ class MealPlanningService:
             sum(i.get("price_estimate", 0) for i in grocery_list),
             2
         )
+
+    def _normalize_name(self, value: str) -> str:
+        return " ".join((value or "").strip().lower().split())

@@ -94,6 +94,18 @@ export const groceryApi = {
   generateAI: (listId: string) => api.post(`/grocery/lists/${listId}/generate-ai`),
 };
 
+export const pantryApi = {
+  listItems: (params?: Record<string, string>) => api.get("/pantry", { params }),
+  createItem: (data: unknown) => api.post("/pantry", data),
+  getItem: (id: string) => api.get(`/pantry/${id}`),
+  updateItem: (id: string, data: unknown) => api.patch(`/pantry/${id}`, data),
+  useItem: (id: string, data: unknown) => api.post(`/pantry/${id}/use`, data),
+  deleteItem: (id: string) => api.delete(`/pantry/${id}`),
+  summary: () => api.get("/pantry/summary"),
+  lowStock: () => api.get("/pantry/alerts/low-stock"),
+  expiring: () => api.get("/pantry/alerts/expiring"),
+};
+
 export const mealsApi = {
   listRecipes: () => api.get("/meals/recipes"),
   createRecipe: (data: unknown) => api.post("/meals/recipes", data),

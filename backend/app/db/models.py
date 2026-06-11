@@ -282,27 +282,6 @@ class Reminder(Base):
 
 
 # ============================================================
-# Household Memory
-# ============================================================
-class HouseholdMemory(Base):
-    __tablename__ = "household_memories"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    content = Column(Text, nullable=False)
-
-    category = Column(String(100))
-    tags = Column(JSON, default=list)
-    source = Column(String(100))
-    importance = Column(Float, default=0.5)
-
-    embedding = Column(JSON)
-    extra_data = Column(JSON, default=dict)
-
-    created_at = Column(DateTime(timezone=True), default=utcnow)
-    expires_at = Column(DateTime(timezone=True))
-
-
-# ============================================================
 # Memory
 class Memory(Base):
     __tablename__ = "memories"

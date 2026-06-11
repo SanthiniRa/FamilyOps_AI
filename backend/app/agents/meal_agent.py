@@ -21,9 +21,22 @@ from app.services.shopping_service import shopping_service
 from app.agents.knowledge_agent import knowledge_agent
 from app.db.database import AsyncSessionLocal
 from app.core.logging import logger
+from app.services.family_preferences import build_meal_memory_hints
 
 
 meal_planning_service = MealPlanningService()
+
+
+def _extract_memory_items(memory_context: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not isinstance(memory_context, dict):
+        return []
+
+    for key in ("memories", "results", "items"):
+        value = memory_context.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+
+    return []
 
 
 # ============================================================
@@ -36,6 +49,7 @@ async def generate_weekly_meal_plan(
     budget: Optional[float] = None,
     planning_horizon_days: int = 7,
     use_pantry_inventory: bool = True,
+    memory_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Generate a weekly meal plan based on family preferences and budget.
@@ -51,6 +65,9 @@ async def generate_weekly_meal_plan(
     """
     try:
         async with AsyncSessionLocal() as db:
+            enriched_preferences = dict(family_preferences or {})
+            enriched_preferences.update(build_meal_memory_hints(_extract_memory_items(memory_context)))
+
             # Get pantry if requested
             pantry_items = []
             if use_pantry_inventory:
@@ -68,7 +85,7 @@ async def generate_weekly_meal_plan(
                 db=db,
                 week_start=week_start,
                 week_end=week_end,
-                preferences=family_preferences,
+                preferences=enriched_preferences,
                 budget=budget,
                 pantry=pantry_dict,
             )

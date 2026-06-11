@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from app.core.config import settings
 from app.core.prompt_versioning import PROMPT_REGISTRY_VERSION, prompt_versions
 from app.db.database import get_db
-from app.db.models import Task, CalendarEvent, GroceryList, MealPlan, Reminder, AgentRun, HouseholdMemory, FamilyMember, Email
+from app.db.models import Task, CalendarEvent, GroceryList, MealPlan, Reminder, AgentRun, FamilyMember, Email
 from app.services.email_filter import evaluate_email_importance, important_email_keywords
 from app.observability.token_tracker import (
     token_tracker

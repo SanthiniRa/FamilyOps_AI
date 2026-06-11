@@ -147,23 +147,7 @@ create table if not exists reminders (
 );
 
 -- ============================================================
--- 9. household_memories
--- ============================================================
-create table if not exists household_memories (
-  id         text primary key default gen_random_uuid()::text,
-  content    text        not null,
-  category   varchar(100),
-  tags       jsonb       default '[]',
-  source     varchar(100),
-  importance float       default 0.5,
-  embedding  vector(768),             -- used for semantic RAG search
-  extra_data jsonb       default '{}',
-  created_at timestamptz default now(),
-  expires_at timestamptz
-);
-
--- ============================================================
--- 10. emails
+-- 9. emails
 -- ============================================================
 create table if not exists emails (
   id           text primary key default gen_random_uuid()::text,
@@ -184,7 +168,7 @@ create table if not exists emails (
 );
 
 -- ============================================================
--- 11. agent_runs
+-- 10. agent_runs
 -- ============================================================
 create table if not exists agent_runs (
   id           text primary key default gen_random_uuid()::text,
@@ -202,7 +186,7 @@ create table if not exists agent_runs (
 );
 
 -- ============================================================
--- 12. events  (audit / event-bus log)
+-- 11. events  (audit / event-bus log)
 -- ============================================================
 create table if not exists events (
   id         text primary key default gen_random_uuid()::text,
@@ -255,8 +239,8 @@ create index if not exists idx_grocery_lists_status on grocery_lists(status);
 create index if not exists idx_reminders_status    on reminders(status);
 create index if not exists idx_reminders_remind_at on reminders(remind_at);
 
-create index if not exists idx_memories_category   on household_memories(category);
-create index if not exists idx_memories_importance on household_memories(importance desc);
+create index if not exists idx_memories_type       on memories(memory_type);
+create index if not exists idx_memories_created    on memories(created_at desc);
 
 create index if not exists idx_agent_runs_status   on agent_runs(status);
 create index if not exists idx_agent_runs_started  on agent_runs(started_at desc);
@@ -266,7 +250,7 @@ create index if not exists idx_events_type         on events(event_type);
 
 -- pgvector indexes for semantic search (cosine similarity)
 create index if not exists idx_memories_embedding
-  on household_memories using ivfflat (embedding vector_cosine_ops)
+  on memories using ivfflat (embedding vector_cosine_ops)
   with (lists = 100);
 
 create index if not exists idx_recipes_embedding

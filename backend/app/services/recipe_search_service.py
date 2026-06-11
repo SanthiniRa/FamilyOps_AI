@@ -26,17 +26,20 @@ class RecipeSearchService:
         *,
         max_results: int = 10,
         ingredient: Optional[str] = None,
+        ingredients: Optional[List[str]] = None,
         category: Optional[str] = None,
     ) -> Dict[str, Any]:
         if self.provider != "themealdb":
             raise ValueError(f"Unsupported recipe provider: {self.provider}")
-        if not query and not ingredient and not category:
+        normalized_ingredients = self._normalize_ingredients(ingredients)
+        if not query and not ingredient and not normalized_ingredients and not category:
             raise ValueError("query, ingredient, or category is required")
 
         cache_key = "::".join(
             [
                 f"query={self._normalize_cache_part(query)}",
                 f"ingredient={self._normalize_cache_part(ingredient)}",
+                f"ingredients={self._normalize_cache_part(','.join(normalized_ingredients))}",
                 f"category={self._normalize_cache_part(category)}",
                 f"max={max_results}",
             ]
@@ -44,12 +47,18 @@ class RecipeSearchService:
         meals = await self.cache.get_or_set(
             f"recipes::{cache_key}",
             self.cache_ttl_seconds,
-            lambda: self._search_meals(query=query, ingredient=ingredient, category=category),
+            lambda: self._search_meals(
+                query=query,
+                ingredient=ingredient,
+                ingredients=normalized_ingredients,
+                category=category,
+            ),
         )
         return {
             "provider": "themealdb",
             "query": query,
             "ingredient": ingredient,
+            "ingredients": normalized_ingredients,
             "category": category,
             "results": meals[:max_results],
         }
@@ -59,11 +68,17 @@ class RecipeSearchService:
         *,
         query: str,
         ingredient: Optional[str],
+        ingredients: Optional[List[str]],
         category: Optional[str],
     ) -> List[Dict[str, Any]]:
         meals: List[Dict[str, Any]] = []
 
+        if ingredients:
+            meals = await self._search_by_ingredients(ingredients)
+
         if query:
+            if meals:
+                return meals
             meals = await self._search_by_name(query)
 
         if not meals and ingredient:
@@ -104,6 +119,21 @@ class RecipeSearchService:
                 if full:
                     normalized.append(full)
         return normalized
+
+    async def _search_by_ingredients(self, ingredients: List[str]) -> List[Dict[str, Any]]:
+        combined: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        for ingredient in ingredients[:5]:
+            results = await self._search_by_ingredient(ingredient)
+            for meal in results:
+                meal_id = str(meal.get("id") or "")
+                if not meal_id or meal_id in seen:
+                    continue
+                seen.add(meal_id)
+                combined.append(meal)
+
+        return combined
 
     async def _search_by_category(self, category: str) -> List[Dict[str, Any]]:
         data = await retry_async(
@@ -148,6 +178,20 @@ class RecipeSearchService:
 
     def _normalize_cache_part(self, value: Optional[str]) -> str:
         return (value or "").strip().lower()
+
+    def _normalize_ingredients(self, ingredients: Optional[List[str]]) -> List[str]:
+        normalized: List[str] = []
+        seen: set[str] = set()
+        for ingredient in ingredients or []:
+            item = (ingredient or "").strip()
+            if not item:
+                continue
+            lowered = item.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            normalized.append(item)
+        return normalized
 
     def _normalize_meal(self, meal: Dict[str, Any]) -> Dict[str, Any]:
         ingredients = []

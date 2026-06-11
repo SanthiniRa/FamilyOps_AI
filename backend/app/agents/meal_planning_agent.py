@@ -1,9 +1,22 @@
-from typing import Dict, Any
-from app.services.meal_planning_service import MealPlanningService
+from typing import Dict, Any, List
+from app.services.meal_planner_service import MealPlanningService
 from app.services.pantry_service import pantry_service
 from app.memory.rag import rag
 from app.db.database import AsyncSessionLocal
 from app.services.rag_service import rag_service
+from app.services.family_preferences import build_meal_memory_hints
+
+
+def _extract_memory_items(memory_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if not isinstance(memory_context, dict):
+        return []
+
+    for key in ("memories", "results", "items"):
+        value = memory_context.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+
+    return []
 
 
 class MealPlanningAgent:
@@ -20,6 +33,7 @@ class MealPlanningAgent:
                 "dislikes": state.get("family_preferences", {}).get("dislikes", []),
                 "vegetarian_days": state.get("metadata", {}).get("vegetarian_days", []),
             }
+            preferences.update(build_meal_memory_hints(_extract_memory_items(state.get("memory_context", {}))))
 
             pantry_items = await pantry_service.get_items(db)
 

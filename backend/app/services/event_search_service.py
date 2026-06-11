@@ -132,6 +132,7 @@ class EventSearchService:
         venue = venues[0] if venues else {}
         images = event.get("images") or []
         image_url = images[0].get("url") if images else None
+        price_ranges = event.get("priceRanges") or []
 
         return {
             "id": event.get("id"),
@@ -141,6 +142,8 @@ class EventSearchService:
             "date": start.get("localDate"),
             "time": start.get("localTime"),
             "status": (dates.get("status") or {}).get("code"),
+            "price_ranges": price_ranges,
+            "cost_summary": _format_price_ranges(price_ranges),
             "venue": {
                 "name": venue.get("name"),
                 "city": (venue.get("city") or {}).get("name"),
@@ -159,6 +162,60 @@ class EventSearchService:
 
     def _normalize_cache_part(self, value: Optional[str]) -> str:
         return (value or "").strip().lower()
+
+
+def _format_price_ranges(price_ranges: List[Dict[str, Any]]) -> Optional[str]:
+    if not price_ranges:
+        return None
+
+    parts: List[str] = []
+    for price_range in price_ranges:
+        minimum = price_range.get("min")
+        maximum = price_range.get("max")
+        currency = str(price_range.get("currency") or "").strip().upper()
+
+        if minimum in (None, "") and maximum in (None, ""):
+            continue
+
+        if minimum == 0 and maximum == 0:
+            parts.append("Free")
+            continue
+
+        min_text = _format_currency_value(minimum, currency)
+        max_text = _format_currency_value(maximum, currency)
+
+        if min_text and max_text and min_text != max_text:
+            parts.append(f"{min_text} to {max_text}")
+        else:
+            parts.append(min_text or max_text)
+
+    if not parts:
+        return None
+
+    return " / ".join(dict.fromkeys(parts))
+
+
+def _format_currency_value(value: Any, currency: str) -> str:
+    if value in (None, ""):
+        return ""
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    if numeric.is_integer():
+        amount = f"{int(numeric)}"
+    else:
+        amount = f"{numeric:.2f}".rstrip("0").rstrip(".")
+
+    symbols = {
+        "GBP": "£",
+        "USD": "$",
+        "EUR": "€",
+    }
+    prefix = symbols.get(currency, f"{currency} " if currency else "")
+    return f"{prefix}{amount}"
 
 
 event_search_service = EventSearchService()

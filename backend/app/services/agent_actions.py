@@ -13,7 +13,7 @@ from app.db.models import GroceryItem, GroceryList, MealPlan
 from app.events.bus import event_bus
 from app.core.logging import logger
 from app.observability.langfuse_client import start_ai_trace, end_ai_generation
-from app.services.family_preferences import get_household_preferences
+from app.services.family_preferences import get_household_meal_preferences
 from app.services.meal_planner_service import MealPlanningService
 from app.services.openai_utils import (
     is_openai_model_not_found_error,
@@ -494,7 +494,7 @@ async def create_meal_plan_from_message(
         week_start = _current_week_start()
     week_end = week_start + timedelta(days=6)
 
-    prefs = await get_household_preferences(db)
+    prefs = await get_household_meal_preferences(db)
     pantry_inventory = _collect_pantry_inventory(db_context)
 
     result = await planner.generate_plan(

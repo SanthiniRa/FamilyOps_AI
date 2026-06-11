@@ -16,7 +16,7 @@ from app.services.openai_utils import (
     openai_chat_model_candidates,
 )
 from app.services.weather_service import weather_service
-from app.services.event_search_service import event_search_service
+from app.services.activity_search_service import activity_search_service
 from app.services.recipe_search_service import recipe_search_service
 from app.services.web_search_service import web_search_service
 from app.services.privacy import redact_pii
@@ -101,6 +101,9 @@ def _strip_trailing_time_words(value: str) -> str:
         " tomorrow",
         " this week",
         " next week",
+        " this weekend",
+        " next weekend",
+        " weekend",
         " tonight",
         " now",
     ]:
@@ -141,6 +144,179 @@ def _extract_recipe_query(message: str) -> str:
 def _matches_any(text: str, phrases: List[str]) -> bool:
     lowered = text.lower()
     return any(phrase in lowered for phrase in phrases)
+
+
+_KIDS_ACTIVITY_SOURCE_DOMAINS = [
+    "dayoutwiththekids.co.uk",
+    "nationaltrust.org.uk",
+    "english-heritage.org.uk",
+    "sciencemuseum.org.uk",
+    "nhm.ac.uk",
+    "britishmuseum.org",
+    "rspb.org.uk",
+    "wildlifetrusts.org",
+    "southbankcentre.co.uk",
+    "visitlondon.com",
+    "eventbrite.co.uk",
+    "primarytimes.co.uk",
+    "familiesonline.co.uk",
+    "artscouncil.org.uk",
+    "ngs.org.uk",
+    "familyinfo.buckinghamshire.gov.uk",
+]
+
+
+def _activity_source_domains(message: str) -> Optional[List[str]]:
+    if not _matches_any(
+        message,
+        [
+            "kids",
+            "children",
+            "family",
+            "families",
+            "family-friendly",
+            "family friendly",
+            "school holiday",
+            "school holidays",
+            "holiday activities",
+            "days out",
+        ],
+    ):
+        return None
+    return _KIDS_ACTIVITY_SOURCE_DOMAINS
+
+
+def _format_activity_reply(location: Optional[str], results: List[Dict[str, Any]]) -> str:
+    area = location or "your area"
+    if not results:
+        return f"No local family-friendly activities were found for {area}."
+
+    lines = [f"Family-friendly activities near {area}:"]
+    for idx, item in enumerate(results[:8], start=1):
+        title = item.get("title") or item.get("name") or "Untitled activity"
+        venue = item.get("venue") or {}
+        when = " ".join(part for part in [item.get("date"), item.get("time")] if part)
+        place = ", ".join(
+            part for part in [
+                venue.get("name"),
+                venue.get("city"),
+                venue.get("country"),
+            ] if part
+        )
+        details = [
+            f"Cost: {item.get('cost')}" if item.get("cost") else None,
+            f"Transport: {item.get('transport')}" if item.get("transport") else None,
+            f"Time taken: {item.get('time_taken')}" if item.get("time_taken") else None,
+            f"Source: {item.get('source')}" if item.get("source") else None,
+            f"Link: {item.get('url')}" if item.get("url") else None,
+        ]
+        detail_text = " | ".join(part for part in details if part)
+        lines.append(
+            f"{idx}. {title}"
+            f"{f' - {when}' if when else ''}"
+            f"{f' - {place}' if place else ''}"
+            f"{f' - {detail_text}' if detail_text else ''}"
+        )
+    return "\n".join(lines)
+
+
+def _format_web_search_reply(query: str, search_results: Dict[str, Any]) -> str:
+    results = search_results.get("pages") or search_results.get("results") or []
+    lines = [f"Web search results for: {search_results.get('query', query)}"]
+    if not results:
+        lines.append("No web results were found.")
+        return "\n".join(lines)
+
+    for idx, item in enumerate(results[:8], start=1):
+        title = item.get("page_title") or item.get("title") or "Untitled"
+        url = item.get("url") or ""
+        snippet = item.get("page_description") or item.get("snippet") or item.get("page_excerpt") or ""
+        lines.append(
+            f"{idx}. {title}"
+            f"{f' - {url}' if url else ''}"
+            f"{f' - {snippet}' if snippet else ''}"
+        )
+    return "\n".join(lines)
+
+
+def _format_weather_reply(location: str, weather: Dict[str, Any]) -> str:
+    resolved = (weather.get("location") or {}).get("name") or location or "your area"
+    lines = [f"Weather for {resolved}"]
+    current = weather.get("current") or {}
+    if current:
+        lines.append(
+            f"Current: {current.get('temperature')}°C, {current.get('summary')}, "
+            f"wind {current.get('wind_speed')} km/h"
+        )
+    daily = weather.get("daily") or []
+    if daily:
+        lines.append("Forecast:")
+        for day in daily[:5]:
+            lines.append(
+                f"- {day.get('date')}: {day.get('summary')} | "
+                f"{day.get('temperature_min')}°C to {day.get('temperature_max')}°C"
+            )
+    return "\n".join(lines)
+
+
+_INVENTORY_RECIPE_HINTS = [
+    "use what i have",
+    "use what we have",
+    "available ingredients",
+    "available in the pantry",
+    "available in the grocery",
+    "ingredients i have",
+    "ingredients we have",
+    "from my pantry",
+    "from our pantry",
+    "from my grocery",
+    "from our grocery",
+    "what can i make",
+    "what can we make",
+    "what can i cook",
+    "what can we cook",
+    "using what i have",
+    "using what we have",
+]
+
+
+def _inventory_recipe_request(message: str) -> bool:
+    return _matches_any(message, _INVENTORY_RECIPE_HINTS)
+
+
+def _normalize_recipe_ingredient(value: str) -> str:
+    return " ".join((value or "").strip().split())
+
+
+def _inventory_recipe_ingredients(db_context: Dict[str, Any]) -> List[str]:
+    ingredients: List[str] = []
+    seen: set[str] = set()
+
+    def add_item(value: Optional[str]) -> None:
+        name = _normalize_recipe_ingredient(str(value or ""))
+        if not name:
+            return
+        lowered = name.lower()
+        if lowered in seen:
+            return
+        seen.add(lowered)
+        ingredients.append(name)
+
+    for item in db_context.get("pantry_items", []) or []:
+        add_item(item.get("name"))
+
+    for item in db_context.get("pantry_snapshot", []) or []:
+        add_item(item.get("name"))
+
+    for item in db_context.get("low_stock_pantry", []) or []:
+        add_item(item.get("name"))
+
+    for grocery_list in db_context.get("grocery_lists", []) or []:
+        for item in grocery_list.get("items", []) or []:
+            if item.get("checked"):
+                add_item(item.get("name"))
+
+    return ingredients[:5]
 
 
 SYSTEM_PROMPT = """You are FamilyOps AI, a warm, practical household operations assistant.
@@ -284,10 +460,12 @@ class FamilyOpsOrchestrator:
         # Fast-path routes for the new external providers.
         if _matches_any(lower, ["weather", "forecast", "temperature", "rain", "wind", "snow", "sunny", "cloudy", "hail"]):
             return "weather"
-        if _matches_any(lower, ["family event", "family events", "events near", "local event", "local events", "things to do", "kids activities", "children activities", "near me"]):
+        if _matches_any(lower, ["family event", "family events", "events near", "local event", "local events", "things to do", "kids activities", "children activities", "school holiday activities", "school holiday activity", "school holidays", "holiday activities", "days out", "near me"]):
             return "event"
         if _matches_any(lower, ["recipe", "recipes", "how do i make", "how to make", "cook this", "meal idea", "dish idea", "bake"]):
             return "recipe"
+        if _matches_any(lower, ["look up", "lookup", "search the web", "web search", "browse the web", "latest", "current", "find online", "online", "internet"]):
+            return "web"
 
         if self.llm:
             trace = start_ai_trace(
@@ -830,7 +1008,7 @@ class FamilyOpsOrchestrator:
             )
 
         context_text = "\n".join(context_lines)
-        reply = await self._call_llm(message, context_text, "Weather", state) if self.llm else context_text
+        reply = _format_weather_reply(location, weather)
         state["reply"] = reply
         state["context"]["resource"] = {
             "type": "weather_search",
@@ -851,41 +1029,30 @@ class FamilyOpsOrchestrator:
         location = _extract_location_from_message(message)
 
         try:
-            events = await event_search_service.search(
-                query=message,
+            activities = await activity_search_service.search(
+                message,
                 location=location,
-                family_friendly=True,
+                source_domains=_activity_source_domains(message),
                 max_results=8,
             )
         except Exception as e:
             logger.warning("events.search_failed", error=str(e))
-            state["reply"] = f"I couldn’t search local events right now: {str(e)}"
+            state["reply"] = f"I couldn’t search local activities right now: {str(e)}"
             state["status"] = "completed"
             await self._finish(state)
             return state
 
-        results = events.get("results") or []
-        context_lines = [f"Local events for {location or 'your area'}"]
-        for idx, item in enumerate(results[:8], start=1):
-            venue = item.get("venue") or {}
-            when = " ".join(part for part in [item.get("date"), item.get("time")] if part)
-            place = ", ".join(
-                part for part in [
-                    venue.get("name"),
-                    venue.get("city"),
-                    venue.get("country"),
-                ] if part
-            )
-            context_lines.append(f"{idx}. {item.get('name')} - {when} - {place}")
-
-        context_text = "\n".join(context_lines) if results else "No local family-friendly events were found."
-        reply = await self._call_llm(message, context_text, "Events", state) if self.llm else context_text
+        results = activities.get("results") or []
+        context_text = _format_activity_reply(location, results)
+        reply = context_text
         state["reply"] = reply
         state["context"]["resource"] = {
-            "type": "event_search",
+            "type": "activity_search",
             "query": message,
             "location": location,
             "results": results,
+            "sources": activities.get("sources") or {},
+            "search_query": activities.get("query", message),
         }
         state["status"] = "completed"
         await self._finish(state)
@@ -897,9 +1064,15 @@ class FamilyOpsOrchestrator:
         state["tools_called"].append("recipe_agent")
         message = state["messages"][-1].content
         query = _extract_recipe_query(message)
+        db_context = state["context"].get("db_context", {})
+        ingredient_hints = _inventory_recipe_ingredients(db_context) if _inventory_recipe_request(message) else []
 
         try:
-            recipes = await recipe_search_service.search(query, max_results=8)
+            recipes = await recipe_search_service.search(
+                query,
+                max_results=8,
+                ingredients=ingredient_hints,
+            )
         except Exception as e:
             logger.warning("recipes.search_failed", error=str(e))
             state["reply"] = f"I couldn’t search recipes right now: {str(e)}"
@@ -908,7 +1081,13 @@ class FamilyOpsOrchestrator:
             return state
 
         results = recipes.get("results") or []
-        context_lines = [f"Recipe search results for: {query}"]
+        context_label = query
+        if ingredient_hints:
+            context_label = f"{query} using {', '.join(ingredient_hints)}"
+
+        context_lines = [f"Recipe search results for: {context_label}"]
+        if ingredient_hints:
+            context_lines.append(f"Available ingredients used: {', '.join(ingredient_hints)}")
         for idx, item in enumerate(results[:8], start=1):
             ingredients = ", ".join((item.get("ingredients") or [])[:6])
             context_lines.append(
@@ -922,6 +1101,7 @@ class FamilyOpsOrchestrator:
         state["context"]["resource"] = {
             "type": "recipe_search",
             "query": query,
+            "ingredients": ingredient_hints,
             "results": results,
         }
         state["status"] = "completed"
@@ -947,24 +1127,7 @@ class FamilyOpsOrchestrator:
             await self._finish(state)
             return state
 
-        context_lines = [f"Web search results for: {search_results.get('query', message)}"]
-        for idx, item in enumerate(search_results.get("pages") or search_results.get("results") or [], start=1):
-            title = item.get("page_title") or item.get("title") or "Untitled"
-            url = item.get("url") or ""
-            snippet = item.get("page_description") or item.get("snippet") or ""
-            excerpt = item.get("page_excerpt") or ""
-            context_lines.append(
-                f"{idx}. {title}\n"
-                f"   URL: {url}\n"
-                f"   Snippet: {snippet or excerpt}"
-            )
-
-        context_text = "\n".join(context_lines)
-
-        if self.llm:
-            reply = await self._call_llm(message, context_text, "Web Search", state)
-        else:
-            reply = context_text
+        reply = _format_web_search_reply(message, search_results)
 
         state["reply"] = reply
         state["context"]["resource"] = {
