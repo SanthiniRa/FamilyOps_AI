@@ -35,6 +35,7 @@ from app.api.routes import (
     weather,
     events,
     recipes,
+    sms,
 )
 
 # ============================================================
@@ -160,6 +161,7 @@ app.include_router(weather.router, prefix="/api/v1", dependencies=protected)
 app.include_router(events.router, prefix="/api/v1", dependencies=protected)
 app.include_router(recipes.router, prefix="/api/v1", dependencies=protected)
 app.include_router(briefing.router, dependencies=protected)
+app.include_router(sms.router, prefix="/api/v1")
 
 Instrumentator().instrument(app).expose(app)
 

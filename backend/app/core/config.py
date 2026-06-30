@@ -112,6 +112,11 @@ class Settings(BaseSettings):
     important_email_senders: str = ""
     important_email_sender_domains: str = ""
 
+    # Twilio (SMS)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
+
     # Google Calendar
     google_client_id: str = ""
     google_client_secret: str = ""

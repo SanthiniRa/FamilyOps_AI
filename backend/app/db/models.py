@@ -406,6 +406,31 @@ class AgentRun(Base):
 
 
 # ============================================================
+# SMS Messages
+# ============================================================
+class SmsMessage(Base):
+    __tablename__ = "sms_messages"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+
+    from_number = Column(String(30), nullable=False)
+    to_number = Column(String(30))
+    body = Column(Text, nullable=False)
+
+    twilio_sid = Column(String(60), unique=True)
+
+    is_appointment = Column(Boolean, default=False)
+    processed = Column(Boolean, default=False)
+
+    extracted_data = Column(JSON, default=dict)
+    tasks_created = Column(JSON, default=list)
+    events_created = Column(JSON, default=list)
+
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    processed_at = Column(DateTime(timezone=True))
+
+
+# ============================================================
 # Events
 # ============================================================
 class Event(Base):
