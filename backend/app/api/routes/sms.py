@@ -369,7 +369,17 @@ async def shortcut_instructions(request: Request):
     Returns step-by-step instructions and a direct Shortcut import link.
     Open this URL in a browser on your iPhone.
     """
-    base = str(request.base_url).rstrip("/")
+    import os
+    # Use the public Replit domain when available so mobile shortcuts
+    # get the correct externally-reachable URL, not localhost.
+    replit_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
+    if replit_domain:
+        base = f"https://{replit_domain}"
+    else:
+        # fallback: try to derive from the request host header
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+        scheme = request.headers.get("x-forwarded-proto", "https")
+        base = f"{scheme}://{host}" if host else str(request.base_url).rstrip("/")
     endpoint = f"{base}/api/v1/sms/shortcut"
     token_note = (
         "Set SMS_WEBHOOK_TOKEN in backend/.env, then paste it into the Shortcut's token field."
