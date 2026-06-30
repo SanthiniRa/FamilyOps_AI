@@ -329,11 +329,17 @@ async def apple_shortcut_get(
     )
     db.add(sms)
     await db.flush()
+    await db.commit()   # commit base row NOW so it survives any AI error below
 
     try:
         await process_single_sms(sms, db)
     except Exception as exc:
         logger.error("sms.shortcut.get.process_error", error=str(exc), exc_info=True)
+        # refresh so we can still read sms.is_appointment etc that process_single_sms may have set
+        try:
+            await db.refresh(sms)
+        except Exception:
+            pass
 
     if sms.is_appointment:
         data = sms.extracted_data or {}

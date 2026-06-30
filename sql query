@@ -287,3 +287,22 @@ create or replace trigger trg_grocery_lists_updated_at
 create or replace trigger trg_meal_plans_updated_at
   before update on meal_plans
   for each row execute function update_updated_at();
+
+
+CREATE TABLE IF NOT EXISTS sms_messages (
+    id          VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    from_number VARCHAR,
+    to_number   VARCHAR,
+    body        TEXT,
+    twilio_sid  VARCHAR UNIQUE,
+    is_appointment BOOLEAN DEFAULT FALSE,
+    processed   BOOLEAN DEFAULT FALSE,
+    extracted_data JSON,
+    tasks_created  JSON,
+    events_created JSON,
+    extra_data     JSONB,
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    processed_at   TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS ix_sms_messages_created_at ON sms_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS ix_sms_messages_is_appointment ON sms_messages(is_appointment);
