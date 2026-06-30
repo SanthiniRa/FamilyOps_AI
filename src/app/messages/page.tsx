@@ -128,25 +128,34 @@ function MessageCard({ msg }: { msg: any }) {
 // ─── Setup guide card ─────────────────────────────────────────────────────────
 function SetupGuide({ endpoint }: { endpoint: string }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
-  const shortcutSteps = [
-    { step: "1", text: "Open the Shortcuts app on your iPhone and tap + to create a new shortcut." },
-    { step: "2", text: "Tap Add Action → search Get Clipboard → select it (this is what you'll paste into)." },
-    { step: "3", text: "Add action: search Get Contents of URL → select it." },
-    { step: "4", text: `Set URL to: ${endpoint}` },
-    { step: "5", text: "Method: POST · Request Body: JSON" },
-    { step: "6", text: 'Add JSON keys: text = Clipboard, source = "sms", sender = "Doctor"' },
-    { step: "7", text: 'Add action: Show Notification → message = result key "summary"' },
-    { step: "8", text: 'Name it "SMS → FamilyOps". Tap Done.' },
-    { step: "9", text: "To use: copy a doctor SMS → open Shortcuts → tap the shortcut." },
+  const smsUrl   = `${endpoint}?source=sms&sender=Doctor&text=`;
+  const waUrl    = `${endpoint}?source=whatsapp&sender=School&text=`;
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  };
+
+  const smsSteps = [
+    { step: "1", label: "Open Shortcuts app → tap + → tap Add Action" },
+    { step: "2", label: 'Search "Get Clipboard" → select it' },
+    { step: "3", label: 'Add another action → search "Get Contents of URL" → select it' },
+    { step: "4", label: "Set Method to GET. Paste the URL below as the URL (no body, no headers needed):", url: smsUrl, urlKey: "sms" },
+    { step: "5", label: '— After "URL" in the action, tap the variable picker (magic wand) → choose Clipboard. This appends your copied SMS to the URL.' },
+    { step: "6", label: 'Add action → search "Show Notification" → Message: tap variable picker → choose "Contents of URL" → type key: summary' },
+    { step: "7", label: 'Name it "SMS → FamilyOps" → Done' },
   ];
 
-  const whatsappSteps = [
-    { step: "1", text: 'Create another shortcut (same as above but: source = "whatsapp", sender = "School").' },
-    { step: "2", text: "For the text key, use Shortcut Input instead of Clipboard." },
-    { step: "3", text: "Tap the shortcut name at top → settings (ⓘ) → enable Use as Quick Action → tick Share Sheet → Types: Text." },
-    { step: "4", text: 'Name it "WhatsApp → FamilyOps". Tap Done.' },
-    { step: "5", text: "To use: in WhatsApp, long-press a school message → Share → WhatsApp → FamilyOps." },
+  const waSteps = [
+    { step: "1", label: 'Create a new shortcut, same 3 actions as above but use the WhatsApp URL:' , url: waUrl, urlKey: "wa" },
+    { step: "2", label: 'For "Get Contents of URL" URL field → use Shortcut Input (not Clipboard).' },
+    { step: "3", label: 'Tap the shortcut name → ⓘ icon → turn on "Use as Quick Action" → tick Share Sheet → Receive: Text.' },
+    { step: "4", label: 'Name it "WhatsApp → FamilyOps" → Done.' },
+    { step: "5", label: 'To use: long-press a WhatsApp message → Share → "WhatsApp → FamilyOps".' },
   ];
 
   return (
@@ -155,50 +164,84 @@ function SetupGuide({ endpoint }: { endpoint: string }) {
         <CardTitle className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-2">
             <Apple className="h-4 w-4" />
-            iPhone Setup — How to forward SMS &amp; WhatsApp to FamilyOps
+            iPhone Setup — tap to see exact steps
           </span>
           {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </CardTitle>
       </CardHeader>
 
       {open && (
-        <CardContent className="pt-0 space-y-5 text-sm">
-          {/* Shortcut for SMS */}
+        <CardContent className="pt-0 space-y-6 text-sm">
+
+          {/* how it works */}
+          <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800">
+            <strong>How it works:</strong> Copy an SMS or share a WhatsApp message → run the Shortcut → the AI reads it, detects appointments, and adds tasks + calendar events automatically. No typing needed.
+          </div>
+
+          {/* SMS shortcut */}
           <div>
             <p className="mb-3 font-semibold flex items-center gap-2">
-              <Smartphone className="h-4 w-4 text-blue-500" /> Shortcut 1 — Forward a doctor SMS
+              <Smartphone className="h-4 w-4 text-blue-500" /> Shortcut 1 — Doctor SMS (copy &amp; run)
             </p>
-            <ol className="space-y-2">
-              {shortcutSteps.map(({ step, text }) => (
+            <ol className="space-y-3">
+              {smsSteps.map(({ step, label, url, urlKey }) => (
                 <li key={step} className="flex gap-3">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">{step}</span>
-                  <span className={step === "4" ? "font-mono text-xs bg-muted rounded px-1 py-0.5 break-all" : "text-muted-foreground"}>{text}</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground leading-snug">{label}</span>
+                    {url && (
+                      <div className="flex items-center gap-2">
+                        <code className="block rounded bg-muted px-2 py-1 text-xs break-all font-mono flex-1">{url}<em className="not-italic text-blue-600">[Clipboard]</em></code>
+                        <button
+                          onClick={() => copy(url, urlKey!)}
+                          className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-muted"
+                        >
+                          {copied === urlKey ? "✓" : "Copy"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </li>
               ))}
             </ol>
+            <div className="mt-3 rounded-md bg-green-50 border border-green-200 p-2 text-xs text-green-800">
+              <strong>To use:</strong> Copy a doctor SMS → open Shortcuts → tap "SMS → FamilyOps" → notification appears ✅
+            </div>
           </div>
 
           <hr />
 
-          {/* Shortcut for WhatsApp */}
+          {/* WhatsApp shortcut */}
           <div>
             <p className="mb-3 font-semibold flex items-center gap-2 text-green-700">
-              <MessageSquare className="h-4 w-4 text-green-500" /> Shortcut 2 — Share a WhatsApp school message
+              <MessageSquare className="h-4 w-4 text-green-500" /> Shortcut 2 — School WhatsApp (share menu)
             </p>
-            <ol className="space-y-2">
-              {whatsappSteps.map(({ step, text }) => (
+            <ol className="space-y-3">
+              {waSteps.map(({ step, label, url, urlKey }) => (
                 <li key={step} className="flex gap-3">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">{step}</span>
-                  <span className="text-muted-foreground">{text}</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground leading-snug">{label}</span>
+                    {url && (
+                      <div className="flex items-center gap-2">
+                        <code className="block rounded bg-muted px-2 py-1 text-xs break-all font-mono flex-1">{url}<em className="not-italic text-green-600">[ShortcutInput]</em></code>
+                        <button
+                          onClick={() => copy(url, urlKey!)}
+                          className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-muted"
+                        >
+                          {copied === urlKey ? "✓" : "Copy"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </li>
               ))}
             </ol>
+            <div className="mt-3 rounded-md bg-green-50 border border-green-200 p-2 text-xs text-green-800">
+              <strong>To use:</strong> Long-press a WhatsApp message → Share → "WhatsApp → FamilyOps" → notification appears ✅
+            </div>
           </div>
 
-          <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-            <strong>Webhook URL to paste into your Shortcut:</strong>
-            <code className="mt-1 block break-all font-mono">{endpoint}</code>
-          </div>
         </CardContent>
       )}
     </Card>

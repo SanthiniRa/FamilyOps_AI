@@ -294,6 +294,74 @@ class ShortcutPayload(BaseModel):
     token: str = ""
 
 
+@router.get("/shortcut")
+async def apple_shortcut_get(
+    text: str = Query(..., description="The SMS or WhatsApp message text"),
+    source: str = Query("sms"),
+    sender: str = Query(""),
+    token: str = Query(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    GET version — easiest to use from Apple Shortcuts.
+    Just build the URL with text= as a query param. No JSON body needed.
+
+    Shortcut action: Get Contents of URL
+      URL: https://<domain>/api/v1/sms/shortcut?source=sms&sender=Doctor&text=<Clipboard>
+    """
+    expected = settings.sms_webhook_token
+    if expected and not hmac.compare_digest(token, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    text = text.strip()
+    if not text:
+        return {"status": "ignored", "reason": "empty message", "summary": "No message text found"}
+
+    logger.info("sms.shortcut.get.received", source=source, length=len(text))
+
+    sms = SmsMessage(
+        from_number=sender or source,
+        to_number="shortcut",
+        body=text,
+        twilio_sid=f"SHORTCUT-{uuid.uuid4().hex}",
+        created_at=datetime.now(timezone.utc),
+        extra_data={"source": source, "sender": sender},
+    )
+    db.add(sms)
+    await db.flush()
+
+    try:
+        await process_single_sms(sms, db)
+    except Exception as exc:
+        logger.error("sms.shortcut.get.process_error", error=str(exc), exc_info=True)
+
+    if sms.is_appointment:
+        data = sms.extracted_data or {}
+        who = data.get("doctor_or_clinic") or sender or "appointment"
+        when_raw = data.get("appointment_date")
+        try:
+            when_str = datetime.fromisoformat(when_raw).strftime("%a %-d %b at %-I:%M %p") if when_raw else "date in message"
+        except Exception:
+            when_str = when_raw or "date in message"
+        summary = f"Added: {who} — {when_str}"
+    else:
+        tasks_count = len(sms.tasks_created or [])
+        events_count = len(sms.events_created or [])
+        if tasks_count or events_count:
+            summary = f"Created {tasks_count} task(s), {events_count} event(s)"
+        else:
+            summary = "Saved to FamilyOps — no appointment detected"
+
+    return {
+        "status": "ok",
+        "sms_id": sms.id,
+        "is_appointment": sms.is_appointment,
+        "tasks_created": len(sms.tasks_created or []),
+        "events_created": len(sms.events_created or []),
+        "summary": summary,
+    }
+
+
 @router.post("/shortcut")
 async def apple_shortcut_webhook(
     payload: ShortcutPayload,
