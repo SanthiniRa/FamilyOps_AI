@@ -425,6 +425,7 @@ class SmsMessage(Base):
     extracted_data = Column(JSON, default=dict)
     tasks_created = Column(JSON, default=list)
     events_created = Column(JSON, default=list)
+    extra_data = Column(JSON, default=dict)
 
     created_at = Column(DateTime(timezone=True), default=utcnow)
     processed_at = Column(DateTime(timezone=True))

@@ -112,7 +112,10 @@ class Settings(BaseSettings):
     important_email_senders: str = ""
     important_email_sender_domains: str = ""
 
-    # Twilio (SMS)
+    # SMS webhook (works with free Android forwarder apps — no Twilio needed)
+    sms_webhook_token: str = ""
+
+    # Twilio (optional — only needed if you use Twilio)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
