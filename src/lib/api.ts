@@ -168,6 +168,15 @@ export const agentApi = {
   stats: () => api.get("/agent/stats"),
 };
 
+export const smsApi = {
+  list: (params?: Record<string, string>) => api.get("/sms/messages", { params }),
+  test: (body: string, from_number?: string) =>
+    api.post(`/sms/test?body=${encodeURIComponent(body)}&from_number=${encodeURIComponent(from_number ?? "+10000000000")}`),
+  shortcut: (payload: { text: string; source: string; sender?: string; token?: string }) =>
+    api.post("/sms/shortcut", payload),
+  instructions: () => api.get("/sms/shortcut-instructions"),
+};
+
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post("/auth/login", data),
   register: (data: { email: string; password: string; full_name?: string | null }) =>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, ShoppingCart, UtensilsCrossed,
-  Bell, Calendar, Brain, Users, Bot, Settings, Home, LogOut, UserCircle2, Package
+  Bell, Calendar, Brain, Users, Bot, Settings, Home, LogOut, UserCircle2, Package, MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ const navItems = [
   { href: "/meals", label: "Meal Plans", icon: UtensilsCrossed },
   { href: "/pantry", label: "Pantry", icon: Package },
   { href: "/reminders", label: "Reminders", icon: Bell },
+  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/family", label: "Family", icon: Users },
   { href: "/agent", label: "AI Agent", icon: Bot },
