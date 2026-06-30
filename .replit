@@ -27,12 +27,13 @@ args = "Start application"
 name = "Backend API"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend && python run.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
+waitForPort = 8000
 
 [[workflows.workflow]]
 name = "Start application"
@@ -52,7 +53,6 @@ externalPort = 5000
 [[ports]]
 localPort = 8000
 externalPort = 8000
-exposeLocalhost = true
 
 [deployment]
 deploymentTarget = "autoscale"

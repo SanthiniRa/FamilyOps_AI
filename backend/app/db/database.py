@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from sqlalchemy.pool import NullPool
 import asyncio
+from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 
 # ============================================================
 # FIX: Supabase + PgBouncer safe URL
@@ -13,20 +14,39 @@ DATABASE_URL = settings.database_url
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(
         "postgresql://",
-        "postgresql+asyncpg://"
+        "postgresql+asyncpg://",
+        1,
     )
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgres://",
+        "postgresql+asyncpg://",
+        1,
+    )
+
+# Strip sslmode from URL query string — asyncpg does not accept it
+# as a keyword arg; we pass ssl=True via connect_args instead.
+_parsed = urlparse(DATABASE_URL)
+_qs = parse_qs(_parsed.query, keep_blank_values=True)
+_need_ssl = _qs.pop("sslmode", ["disable"])[0] not in ("disable", "allow")
+_clean_query = urlencode({k: v[0] for k, v in _qs.items()})
+DATABASE_URL = urlunparse(_parsed._replace(query=_clean_query))
+
+_connect_args: dict = {"statement_cache_size": 0}
+if _need_ssl:
+    _connect_args["ssl"] = True
+
+IS_SQLITE = "sqlite" in DATABASE_URL
 
 # ============================================================
 # ENGINE (IMPORTANT FIXES HERE)
 # ============================================================
 engine = create_async_engine(
-    DATABASE_URL,
+    DATABASE_URL if not IS_SQLITE else DATABASE_URL,
     echo=settings.debug,
     poolclass=NullPool,
     pool_pre_ping=True,
-    connect_args={
-        "statement_cache_size": 0,
-    }
+    connect_args={} if IS_SQLITE else _connect_args,
 )
 
 # ============================================================
