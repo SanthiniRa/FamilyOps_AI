@@ -35,6 +35,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Form, Header, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -280,6 +281,128 @@ async def list_sms_messages(
         }
         for m in messages
     ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Apple Shortcuts endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ShortcutPayload(BaseModel):
+    text: str
+    source: str = "shortcut"
+    sender: str = ""
+    token: str = ""
+
+
+@router.post("/shortcut")
+async def apple_shortcut_webhook(
+    payload: ShortcutPayload,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Called by an Apple Shortcut.  The Shortcut sends whatever text the user
+    copied or shared (SMS, WhatsApp, etc.) and FamilyOps processes it with AI.
+
+    Setup instructions are returned from GET /api/v1/sms/shortcut-instructions.
+
+    Accepts JSON:
+      { "text": "<message body>", "source": "sms|whatsapp|other",
+        "sender": "Dr Smith", "token": "<SMS_WEBHOOK_TOKEN>" }
+    """
+    expected = settings.sms_webhook_token
+    if expected and not hmac.compare_digest(payload.token, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    text = payload.text.strip()
+    if not text:
+        return {"status": "ignored", "reason": "empty message"}
+
+    logger.info("sms.shortcut.received", source=payload.source, length=len(text))
+
+    sms = SmsMessage(
+        from_number = payload.sender or payload.source,
+        to_number   = "shortcut",
+        body        = text,
+        twilio_sid  = f"SHORTCUT-{uuid.uuid4().hex}",
+        created_at  = datetime.now(timezone.utc),
+        extra_data  = {"source": payload.source, "sender": payload.sender},
+    )
+    db.add(sms)
+    await db.flush()
+
+    try:
+        await process_single_sms(sms, db)
+    except Exception as exc:
+        logger.error("sms.shortcut.process_error", error=str(exc), exc_info=True)
+
+    # Build a notification-friendly summary
+    if sms.is_appointment:
+        data     = sms.extracted_data or {}
+        who      = data.get("doctor_or_clinic") or payload.sender or "appointment"
+        when_raw = data.get("appointment_date")
+        try:
+            when_str = datetime.fromisoformat(when_raw).strftime("%a %-d %b at %-I:%M %p") if when_raw else "date in message"
+        except Exception:
+            when_str = when_raw or "date in message"
+        summary = f"✅ Added: {who} — {when_str}"
+    else:
+        tasks_count  = len(sms.tasks_created or [])
+        events_count = len(sms.events_created or [])
+        if tasks_count or events_count:
+            summary = f"✅ Created {tasks_count} task(s), {events_count} event(s)"
+        else:
+            summary = "💬 Saved to FamilyOps — no appointment detected"
+
+    return {
+        "status":         "ok",
+        "sms_id":         sms.id,
+        "is_appointment": sms.is_appointment,
+        "tasks_created":  len(sms.tasks_created or []),
+        "events_created": len(sms.events_created or []),
+        "summary":        summary,
+    }
+
+
+@router.get("/shortcut-instructions")
+async def shortcut_instructions(request: Request):
+    """
+    Returns step-by-step instructions and a direct Shortcut import link.
+    Open this URL in a browser on your iPhone.
+    """
+    base = str(request.base_url).rstrip("/")
+    endpoint = f"{base}/api/v1/sms/shortcut"
+    token_note = (
+        "Set SMS_WEBHOOK_TOKEN in backend/.env, then paste it into the Shortcut's token field."
+        if not settings.sms_webhook_token
+        else "Your SMS_WEBHOOK_TOKEN is configured — paste it into the Shortcut."
+    )
+
+    return {
+        "endpoint": endpoint,
+        "method":   "POST",
+        "body_format": {
+            "text":   "<the copied/shared message>",
+            "source": "sms  or  whatsapp  or  other",
+            "sender": "optional — e.g. Dr Smith or School Group",
+            "token":  "<your SMS_WEBHOOK_TOKEN or leave blank>",
+        },
+        "token_note": token_note,
+        "iphone_steps": [
+            "1. Open the Shortcuts app on your iPhone.",
+            "2. Tap '+' to create a new shortcut.",
+            "3. Tap 'Add Action' → search 'Text' → choose 'Text' block → type a placeholder (we'll replace this).",
+            "4. Add action: 'Get Clipboard' (for copied SMS) OR enable 'Share Sheet' in shortcut settings (for WhatsApp).",
+            "5. Add action: search 'URL' → paste: " + endpoint,
+            "6. Add action: search 'Get Contents of URL':",
+            "   • Method: POST",
+            "   • Headers: Content-Type = application/json",
+            "   • Body: JSON — add keys: text (Shortcut Input or Clipboard), source (text: sms), sender (text: Dr), token (text: your-token)",
+            "7. Add action: 'Show Notification' → Message = result of previous step → key 'summary'.",
+            "8. Name the shortcut 'Send to FamilyOps'.",
+            "9. For WhatsApp: tap shortcut settings (top) → enable 'Show in Share Sheet' → Types: Text.",
+            "10. In WhatsApp: long-press a message → Share → choose 'Send to FamilyOps'.",
+        ],
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
