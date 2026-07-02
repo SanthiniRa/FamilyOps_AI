@@ -6,7 +6,8 @@
     "dev": "next dev -p 5000 -H 0.0.0.0",
     "build": "next build",
     "start": "next start -p 5000 -H 0.0.0.0",
-    "backend": "cd backend && python -m uvicorn main:app --host localhost --port 8000 --reload"
+    "backend": "cd backend && python -m uvicorn main:app --host localhost --port 8000 --reload",
+    "docker": "bash scripts/docker-up.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.6.0",

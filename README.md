@@ -185,11 +185,10 @@ npm run backend
 ### Run with Docker
 
 ```sh
-cp backend/.env.example backend/.env
-docker compose up --build
+npm run docker
 ```
 
-The Compose stack brings up the frontend, backend, PostgreSQL, Redis, and Qdrant together. See [DEPLOYMENT.md](/workspaces/FamilyOps_AI/DEPLOYMENT.md) for production notes.
+The Compose stack brings up the frontend, backend, PostgreSQL, Redis, and Qdrant together. Copy `backend/.env.example` to `backend/.env` first only if you want to override the Docker defaults. See [DEPLOYMENT.md](/workspaces/FamilyOps_AI/DEPLOYMENT.md) for production notes.
 The Docker stack enables shared resilience Redis in the backend container so retries, caching, and rate limits are coordinated across services.
 
 Optional background jobs:

@@ -12,19 +12,21 @@ This repo now includes a Docker Compose stack that runs:
 
 ### Start the stack
 
-1. Copy the backend environment template:
+1. If you want to override any keys, copy the backend environment template:
 
 ```sh
 cp backend/.env.example backend/.env
 ```
 
-2. Fill in the secrets and API keys you want to use.
+2. Fill in any secrets and API keys you want to use.
 
-3. Start everything:
+3. Start everything from the repo root:
 
 ```sh
-docker compose up --build
+npm run docker
 ```
+
+If you prefer to call Compose directly, the launcher uses `docker compose up --build` when the plugin is installed and falls back to `docker-compose up --build` if that is the only Compose command available.
 
 ## Production Notes
 
