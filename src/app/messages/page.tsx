@@ -126,12 +126,17 @@ function MessageCard({ msg }: { msg: any }) {
 }
 
 // ─── Setup guide card ─────────────────────────────────────────────────────────
-function SetupGuide({ endpoint }: { endpoint: string }) {
+function SetupGuide({ endpoint, instructions }: { endpoint: string; instructions?: any }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-
-  const smsUrl   = `${endpoint}?source=sms&sender=Doctor&text=`;
-  const waUrl    = `${endpoint}?source=whatsapp&sender=School&text=`;
+  const resolvedEndpoint = instructions?.endpoint ?? endpoint;
+  const tokenNote = instructions?.token_note ?? "";
+  const bodyFormat = instructions?.body_format ?? {
+    text: "<the copied/shared message>",
+    source: "sms  or  whatsapp  or  other",
+    sender: "optional sender label",
+    token: "<your SMS_WEBHOOK_TOKEN or leave blank>",
+  };
 
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -144,18 +149,19 @@ function SetupGuide({ endpoint }: { endpoint: string }) {
     { step: "1", label: "Open Shortcuts app → tap + → tap Add Action" },
     { step: "2", label: 'Search "Get Clipboard" → select it' },
     { step: "3", label: 'Add another action → search "Get Contents of URL" → select it' },
-    { step: "4", label: "Set Method to GET. Paste the URL below as the URL (no body, no headers needed):", url: smsUrl, urlKey: "sms" },
-    { step: "5", label: '— After "URL" in the action, tap the variable picker (magic wand) → choose Clipboard. This appends your copied SMS to the URL.' },
-    { step: "6", label: 'Add action → search "Show Notification" → Message: tap variable picker → choose "Contents of URL" → type key: summary' },
+    { step: "4", label: "Set Method to POST. Paste the URL below as the request URL (do not append the SMS to the URL):", url: resolvedEndpoint, urlKey: "sms" },
+    { step: "5", label: 'Set Request Body to JSON and add these keys: text, source, sender, token. Use Clipboard for text.' },
+    { step: "6", label: 'Add action → search "Show Notification" → Message: tap variable picker → choose "Contents of URL" → key: summary' },
     { step: "7", label: 'Name it "SMS → FamilyOps" → Done' },
   ];
 
   const waSteps = [
-    { step: "1", label: 'Create a new shortcut, same 3 actions as above but use the WhatsApp URL:' , url: waUrl, urlKey: "wa" },
-    { step: "2", label: 'For "Get Contents of URL" URL field → use Shortcut Input (not Clipboard).' },
-    { step: "3", label: 'Tap the shortcut name → ⓘ icon → turn on "Use as Quick Action" → tick Share Sheet → Receive: Text.' },
-    { step: "4", label: 'Name it "WhatsApp → FamilyOps" → Done.' },
-    { step: "5", label: 'To use: long-press a WhatsApp message → Share → "WhatsApp → FamilyOps".' },
+    { step: "1", label: 'Create a new shortcut with the same actions, but use the same POST endpoint below:' , url: resolvedEndpoint, urlKey: "wa" },
+    { step: "2", label: 'For "Get Contents of URL" → use Shortcut Input as the text value (not Clipboard).' },
+    { step: "3", label: 'Set source to whatsapp in the JSON body and keep the rest the same.' },
+    { step: "4", label: 'Tap the shortcut name → ⓘ icon → turn on "Use as Quick Action" → tick Share Sheet → Receive: Text.' },
+    { step: "5", label: 'Name it "WhatsApp → FamilyOps" → Done.' },
+    { step: "6", label: 'To use: long-press a WhatsApp message → Share → "WhatsApp → FamilyOps".' },
   ];
 
   return (
@@ -176,6 +182,9 @@ function SetupGuide({ endpoint }: { endpoint: string }) {
           {/* how it works */}
           <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800">
             <strong>How it works:</strong> Copy an SMS or share a WhatsApp message → run the Shortcut → the AI reads it, detects appointments, and adds tasks + calendar events automatically. No typing needed.
+            <div className="mt-2">
+              <strong>Important:</strong> use POST JSON, not a GET query string. That avoids broken URLs when messages contain punctuation or ampersands.
+            </div>
           </div>
 
           {/* SMS shortcut */}
@@ -191,7 +200,7 @@ function SetupGuide({ endpoint }: { endpoint: string }) {
                     <span className="text-muted-foreground leading-snug">{label}</span>
                     {url && (
                       <div className="flex items-center gap-2">
-                        <code className="block rounded bg-muted px-2 py-1 text-xs break-all font-mono flex-1">{url}<em className="not-italic text-blue-600">[Clipboard]</em></code>
+                        <code className="block rounded bg-muted px-2 py-1 text-xs break-all font-mono flex-1">{url}</code>
                         <button
                           onClick={() => copy(url, urlKey!)}
                           className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-muted"
@@ -206,6 +215,13 @@ function SetupGuide({ endpoint }: { endpoint: string }) {
             </ol>
             <div className="mt-3 rounded-md bg-green-50 border border-green-200 p-2 text-xs text-green-800">
               <strong>To use:</strong> Copy a doctor SMS → open Shortcuts → tap "SMS → FamilyOps" → notification appears ✅
+            </div>
+            <div className="mt-3 rounded-md border bg-muted/30 p-3 text-xs">
+              <p className="font-semibold mb-2">JSON body</p>
+              <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5">
+{JSON.stringify(bodyFormat, null, 2)}
+              </pre>
+              {tokenNote && <p className="mt-2 text-muted-foreground">{tokenNote}</p>}
             </div>
           </div>
 
@@ -224,7 +240,7 @@ function SetupGuide({ endpoint }: { endpoint: string }) {
                     <span className="text-muted-foreground leading-snug">{label}</span>
                     {url && (
                       <div className="flex items-center gap-2">
-                        <code className="block rounded bg-muted px-2 py-1 text-xs break-all font-mono flex-1">{url}<em className="not-italic text-green-600">[ShortcutInput]</em></code>
+                        <code className="block rounded bg-muted px-2 py-1 text-xs break-all font-mono flex-1">{url}</code>
                         <button
                           onClick={() => copy(url, urlKey!)}
                           className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-muted"
@@ -239,6 +255,13 @@ function SetupGuide({ endpoint }: { endpoint: string }) {
             </ol>
             <div className="mt-3 rounded-md bg-green-50 border border-green-200 p-2 text-xs text-green-800">
               <strong>To use:</strong> Long-press a WhatsApp message → Share → "WhatsApp → FamilyOps" → notification appears ✅
+            </div>
+            <div className="mt-3 rounded-md border bg-muted/30 p-3 text-xs">
+              <p className="font-semibold mb-2">JSON body</p>
+              <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5">
+{JSON.stringify({ ...bodyFormat, source: "whatsapp" }, null, 2)}
+              </pre>
+              {tokenNote && <p className="mt-2 text-muted-foreground">{tokenNote}</p>}
             </div>
           </div>
 
@@ -373,7 +396,10 @@ export default function MessagesPage() {
       </div>
 
       {/* setup guide */}
-      <SetupGuide endpoint={instructions?.endpoint ?? `${typeof window !== "undefined" ? window.location.origin : ""}/api/v1/sms/shortcut`} />
+      <SetupGuide
+        endpoint={`${typeof window !== "undefined" ? window.location.origin : ""}/api/v1/sms/shortcut`}
+        instructions={instructions}
+      />
 
       {/* test panel */}
       <TestPanel onTested={() => qc.invalidateQueries({ queryKey: ["sms-messages"] })} />

@@ -3,15 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 import asyncio
-import traceback
-from app.workers.email_ingestor import ingest_emails
 from app.core.config import settings
 from app.core.auth import require_api_token
 from app.core.logging import setup_logging, logger
 from app.db.database import init_db, AsyncSessionLocal
 import os
 from app.events.bus import event_bus
-from app.workers.email_processor import process_emails
 from app.observability.middleware import RequestLoggingMiddleware
 from app.api.routes import briefing
 
@@ -58,7 +55,8 @@ async def lifespan(app: FastAPI):
             "database.startup.failed",
             error=str(e),
         )
-        raise
+        if settings.environment not in {"development", "local"}:
+            raise
 
     # Start event bus
     event_task = asyncio.create_task(event_bus.start())
@@ -73,18 +71,31 @@ async def lifespan(app: FastAPI):
         logger.info("observability.langfuse.disabled")
     # Run email pipeline ONCE at startup (safe init)
     try:
-        logger.info("email.startup.processing")
+        should_start_email_pipeline = (
+            settings.environment not in {"development", "local"}
+            and settings.email_address
+            and settings.email_password
+        )
 
-        async with AsyncSessionLocal() as db:
-            if settings.email_address and settings.email_password:
+        if should_start_email_pipeline:
+            logger.info("email.startup.processing")
+
+            # Import the email pipeline lazily so the API can still boot when
+            # optional email dependencies are unavailable in local dev.
+            from app.workers.email_ingestor import ingest_emails
+            from app.workers.email_processor import process_emails
+
+            async with AsyncSessionLocal() as db:
                 await ingest_emails(
                     db,
                     settings.email_address,
                     settings.email_password,
                 )
-            await process_emails(db)
+                await process_emails(db)
 
-        logger.info("email.startup.completed")
+            logger.info("email.startup.completed")
+        else:
+            logger.info("email.startup.skipped")
 
     except Exception as e:
         logger.exception("email.startup.error", error=str(e))

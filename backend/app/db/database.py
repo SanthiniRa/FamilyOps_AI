@@ -8,35 +8,39 @@ from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 # ============================================================
 # FIX: Supabase + PgBouncer safe URL
 # ============================================================
-DATABASE_URL = settings.database_url
+def normalize_database_url(raw_url: str | None) -> str:
+    candidate = (raw_url or "").strip()
+    if not candidate:
+        return "sqlite+aiosqlite:///./familyops.db"
 
-# Force asyncpg driver
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgresql://",
-        "postgresql+asyncpg://",
-        1,
-    )
-elif DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgres://",
-        "postgresql+asyncpg://",
-        1,
-    )
+    if candidate.startswith("sqlite://") and not candidate.startswith("sqlite+aiosqlite://"):
+        return candidate.replace("sqlite://", "sqlite+aiosqlite://", 1)
 
-# Strip sslmode from URL query string — asyncpg does not accept it
-# as a keyword arg; we pass ssl=True via connect_args instead.
-_parsed = urlparse(DATABASE_URL)
-_qs = parse_qs(_parsed.query, keep_blank_values=True)
-_need_ssl = _qs.pop("sslmode", ["disable"])[0] not in ("disable", "allow")
-_clean_query = urlencode({k: v[0] for k, v in _qs.items()})
-DATABASE_URL = urlunparse(_parsed._replace(query=_clean_query))
+    if candidate.startswith("postgresql://"):
+        return candidate.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    if candidate.startswith("postgres://"):
+        return candidate.replace("postgres://", "postgresql+asyncpg://", 1)
+
+    return candidate
+
+
+DATABASE_URL = normalize_database_url(settings.database_url)
 
 _connect_args: dict = {"statement_cache_size": 0}
-if _need_ssl:
-    _connect_args["ssl"] = True
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
-IS_SQLITE = "sqlite" in DATABASE_URL
+if not IS_SQLITE:
+    # Strip sslmode from URL query string — asyncpg does not accept it
+    # as a keyword arg; we pass ssl=True via connect_args instead.
+    _parsed = urlparse(DATABASE_URL)
+    _qs = parse_qs(_parsed.query, keep_blank_values=True)
+    _need_ssl = _qs.pop("sslmode", ["disable"])[0] not in ("disable", "allow")
+    _clean_query = urlencode({k: v[0] for k, v in _qs.items()})
+    DATABASE_URL = urlunparse(_parsed._replace(query=_clean_query))
+
+    if _need_ssl:
+        _connect_args["ssl"] = True
 
 # ============================================================
 # ENGINE (IMPORTANT FIXES HERE)

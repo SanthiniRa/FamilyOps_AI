@@ -6,13 +6,22 @@ from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
 from app.db.database import get_db
 from app.db.models import AgentRun, Task, CalendarEvent, GroceryList, GroceryItem, Reminder, Memory, MealPlan, FamilyMember, PantryItem, User
-from app.agents.orchestrator import orchestrator
 from app.core.auth import get_optional_current_user
 from app.core.ownership import get_owner_family_member_id, metadata_matches_owner
 from app.services.pantry_service import pantry_service
 from app.services.privacy import redact_pii_in_obj
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+_orchestrator = None
+
+
+def _get_orchestrator():
+    global _orchestrator
+    if _orchestrator is None:
+        from app.agents.orchestrator import orchestrator
+
+        _orchestrator = orchestrator
+    return _orchestrator
 
 
 class AgentRequest(BaseModel):
@@ -225,6 +234,14 @@ async def chat_with_agent(
                 "family_member_id": current_user.family_member_id if current_user else None,
             } if current_user else None,
         }
+
+        try:
+            orchestrator = _get_orchestrator()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Agent runtime is unavailable in this local environment.",
+            ) from exc
 
         result = await orchestrator.run(request.message, merged_context)
         duration_ms = int((time.time() - start) * 1000)
