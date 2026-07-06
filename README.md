@@ -170,13 +170,21 @@ Then fill in the values you need in `backend/.env`.
 
 ### Run locally
 
-Frontend:
+One command for both services:
+
+```sh
+npm run up
+```
+
+This keeps the backend virtualenv outside the repo in `/private/tmp` by default, uses the local SQLite fallback, and starts the frontend and backend together without leaving tracked files behind.
+
+Frontend only:
 
 ```sh
 npm run dev
 ```
 
-Backend:
+Backend only:
 
 ```sh
 npm run backend
