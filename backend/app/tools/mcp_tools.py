@@ -3,7 +3,7 @@ from typing import Optional
 from app.db.database import AsyncSessionLocal
 from app.db.models import Task, CalendarEvent, Email
 from app.services.rag_service import rag_service
-from datetime import datetime
+from datetime import datetime, date, time, timezone
 from sqlalchemy import insert
 from app.observability.metrics import TOOL_COUNTER
 from app.core.ownership import with_owner_metadata
@@ -12,6 +12,27 @@ class MCPTools:
 
     def _owner_family_member_id(self, data: dict) -> Optional[str]:
         return data.get("owner_family_member_id") or data.get("created_by")
+
+    def _normalize_due_date(self, value):
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, date):
+            return datetime.combine(value, time(9, 0), tzinfo=timezone.utc)
+        if isinstance(value, str):
+            try:
+                parsed = datetime.fromisoformat(value)
+            except ValueError:
+                try:
+                    parsed_date = date.fromisoformat(value)
+                    return datetime.combine(parsed_date, time(9, 0), tzinfo=timezone.utc)
+                except ValueError:
+                    return None
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        return None
 
     # =========================
     # TASK TOOL
@@ -22,9 +43,12 @@ class MCPTools:
             task = Task(
                 title=data["title"],
                 description=data.get("description"),
-                status="pending",
+                due_date=self._normalize_due_date(data.get("due_date")),
+                priority=data.get("priority", "medium"),
+                status=data.get("status", "pending"),
                 agent_generated=True,
                 created_by=owner_family_member_id,
+                tags=data.get("tags", []),
                 extra_data=with_owner_metadata(data.get("extra_data"), owner_family_member_id),
             )
             TOOL_COUNTER.labels(

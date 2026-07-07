@@ -30,10 +30,12 @@ import hashlib
 import hmac
 import base64
 import uuid
-from datetime import datetime, timezone
+import tempfile
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, Form, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,10 +44,15 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.logging import logger
 from app.db.database import get_db
-from app.db.models import SmsMessage
+from app.db.models import SmsMessage, UploadedImage
+from app.services import ingest_service
+from app.services.poster_service import PosterVisionService
+from app.tools.mcp_tools import MCPTools
 from app.workers.sms_processor import process_single_sms
 
 router = APIRouter(prefix="/sms", tags=["sms"])
+tools = MCPTools()
+poster_service = PosterVisionService()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -437,6 +444,154 @@ async def apple_shortcut_webhook(
     }
 
 
+@router.post("/shortcut-image")
+async def apple_shortcut_image(
+    file: UploadFile = File(...),
+    source: str = Form("poster"),
+    sender: str = Form(""),
+    token: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Called by an Apple Shortcut that shares a poster, flyer, or screenshot.
+
+    The Shortcut should send multipart/form-data with:
+      - file: the shared image
+      - source: poster | whatsapp | image
+      - sender: optional sender label
+      - token: optional shared secret
+    """
+    expected = settings.sms_webhook_token
+    if expected and not hmac.compare_digest(token, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    suffix = Path(file.filename or "").suffix or ".jpg"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    ocr_text = ""
+    analysis: Dict[str, Any] = {}
+    img = UploadedImage(
+        image_url="",
+        storage_path=tmp_path,
+        analysis_result={"source": source, "sender": sender},
+    )
+
+    try:
+        ocr_pages = await ingest_service.extract_text_from_image(Path(tmp_path))
+        ocr_text = "\n".join(
+            page.get("text", "").strip()
+            for page in ocr_pages
+            if page.get("text", "").strip()
+        ).strip()
+
+        analysis = await poster_service.analyze_poster_text(ocr_text, filename=file.filename)
+
+        img.analysis_result = {
+            "source": source,
+            "sender": sender,
+            "ocr_text": ocr_text,
+            "analysis": analysis,
+        }
+        db.add(img)
+        await db.flush()
+        await db.commit()
+        await db.refresh(img)
+
+        event_id = ""
+        task_id = ""
+
+        all_day_date = analysis.get("event_all_day_date")
+        start_iso = analysis.get("event_start_iso")
+        end_iso = analysis.get("event_end_iso")
+
+        if all_day_date and not (start_iso and end_iso):
+            try:
+                day = datetime.fromisoformat(all_day_date).replace(tzinfo=timezone.utc)
+                start_iso = day.isoformat()
+                end_iso = (day + timedelta(days=1) - timedelta(seconds=1)).isoformat()
+            except Exception:
+                start_iso = None
+                end_iso = None
+
+        if start_iso and end_iso:
+            try:
+                event_result = await tools.create_event({
+                    "title": analysis.get("title") or analysis.get("task_title") or "Poster event",
+                    "description": analysis.get("description") or analysis.get("summary") or ocr_text[:300],
+                    "start_time": start_iso,
+                    "end_time": end_iso,
+                    "location": analysis.get("location"),
+                    "extra_data": {
+                        "source": source,
+                        "sender": sender,
+                        "ocr_text": ocr_text,
+                        "uploaded_image_id": img.id,
+                    },
+                })
+                event_id = event_result.get("event_id", "")
+            except Exception as exc:
+                logger.error("poster.event.create.failed", error=str(exc), exc_info=True)
+
+        task_due_iso = analysis.get("task_due_iso")
+        if not task_due_iso and all_day_date:
+            try:
+                task_due_iso = datetime.fromisoformat(all_day_date).replace(tzinfo=timezone.utc).isoformat()
+            except Exception:
+                task_due_iso = None
+
+        if task_due_iso or analysis.get("task_title") or analysis.get("title"):
+            try:
+                task_result = await tools.create_task({
+                    "title": analysis.get("task_title") or analysis.get("title") or "Review poster",
+                    "description": analysis.get("task_description") or analysis.get("summary") or ocr_text[:300],
+                    "priority": "medium",
+                    "status": "pending",
+                    "due_date": task_due_iso,
+                    "tags": ["poster", "image", source],
+                    "extra_data": {
+                        "source": source,
+                        "sender": sender,
+                        "ocr_text": ocr_text,
+                        "uploaded_image_id": img.id,
+                    },
+                })
+                task_id = task_result.get("task_id", "")
+            except Exception as exc:
+                logger.error("poster.task.create.failed", error=str(exc), exc_info=True)
+
+        img.analysis_result = {
+            **(img.analysis_result or {}),
+            "event_id": event_id,
+            "task_id": task_id,
+        }
+        db.add(img)
+        await db.commit()
+
+        summary = analysis.get("summary") or "Poster image processed"
+        if event_id and task_id:
+            summary = f"Created event and task: {summary}"
+        elif event_id:
+            summary = f"Created calendar event: {summary}"
+        elif task_id:
+            summary = f"Created task: {summary}"
+
+        return {
+            "status": "ok",
+            "image_id": img.id,
+            "ocr_text": ocr_text,
+            "analysis": analysis,
+            "event_id": event_id,
+            "task_id": task_id,
+            "summary": summary,
+        }
+    except Exception as exc:
+        logger.error("poster.image.process_failed", error=str(exc), exc_info=True)
+        raise
+
+
 @router.get("/shortcut-instructions")
 async def shortcut_instructions(request: Request):
     """
@@ -463,6 +618,7 @@ async def shortcut_instructions(request: Request):
 
     return {
         "endpoint": endpoint,
+        "poster_endpoint": f"{base}/api/v1/sms/shortcut-image",
         "method":   "POST",
         "body_format": {
             "text":   "<the copied/shared message>",
@@ -485,6 +641,8 @@ async def shortcut_instructions(request: Request):
             "8. Name the shortcut 'Send to FamilyOps'.",
             "9. For WhatsApp: tap shortcut settings (top) → enable 'Show in Share Sheet' → Types: Text.",
             "10. In WhatsApp: long-press a message → Share → choose 'Send to FamilyOps'.",
+            "11. For posters/flyers: create a second shortcut with Share Sheet → Receive: Images and use /api/v1/sms/shortcut-image.",
+            "12. Use Request Body = Form and add file=file, source=poster, sender=optional, token=your-token.",
         ],
     }
 

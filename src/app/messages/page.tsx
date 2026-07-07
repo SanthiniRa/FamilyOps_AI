@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   MessageSquare, Calendar, CheckSquare, Smartphone, Send,
-  RefreshCw, AlertCircle, ChevronDown, ChevronUp, Apple, Clipboard
+  RefreshCw, AlertCircle, ChevronDown, ChevronUp, Apple, Clipboard, Image as ImageIcon
 } from "lucide-react";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -130,6 +130,7 @@ function SetupGuide({ endpoint, instructions }: { endpoint: string; instructions
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const resolvedEndpoint = instructions?.endpoint ?? endpoint;
+  const posterEndpoint = instructions?.poster_endpoint ?? endpoint.replace(/\/shortcut$/, "/shortcut-image");
   const tokenNote = instructions?.token_note ?? "";
   const bodyFormat = instructions?.body_format ?? {
     text: "<the copied/shared message>",
@@ -164,6 +165,16 @@ function SetupGuide({ endpoint, instructions }: { endpoint: string; instructions
     { step: "6", label: 'To use: long-press a WhatsApp message → Share → "WhatsApp → FamilyOps".' },
   ];
 
+  const posterSteps = [
+    { step: "1", label: "Create a new shortcut → turn on Share Sheet → Receive: Images" },
+    { step: "2", label: 'Add action → search "Get Contents of URL" → select it' },
+    { step: "3", label: "Set Method to POST. Paste the image endpoint below as the request URL:", url: posterEndpoint, urlKey: "poster" },
+    { step: "4", label: 'Set Request Body to Form. Add a file field named "file" and set it to Shortcut Input.' },
+    { step: "5", label: 'Add text fields: source = poster, sender = optional, token = your token.' },
+    { step: "6", label: 'Add action → "Show Notification" → Message: Contents of URL → summary' },
+    { step: "7", label: 'Name it "Poster → FamilyOps" → Done' },
+  ];
+
   return (
     <Card className="border-dashed border-2 border-muted">
       <CardHeader className="pb-2 cursor-pointer" onClick={() => setOpen(!open)}>
@@ -181,7 +192,7 @@ function SetupGuide({ endpoint, instructions }: { endpoint: string; instructions
 
           {/* how it works */}
           <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800">
-            <strong>How it works:</strong> Copy an SMS or share a WhatsApp message → run the Shortcut → the AI reads it, detects appointments, and adds tasks + calendar events automatically. No typing needed.
+            <strong>How it works:</strong> Copy an SMS, share a WhatsApp message, or share a poster image → run the Shortcut → the AI reads it, detects appointments or date-based reminders, and adds tasks + calendar events automatically. No typing needed.
             <div className="mt-2">
               <strong>Important:</strong> use POST JSON, not a GET query string. That avoids broken URLs when messages contain punctuation or ampersands.
             </div>
@@ -262,6 +273,39 @@ function SetupGuide({ endpoint, instructions }: { endpoint: string; instructions
 {JSON.stringify({ ...bodyFormat, source: "whatsapp" }, null, 2)}
               </pre>
               {tokenNote && <p className="mt-2 text-muted-foreground">{tokenNote}</p>}
+            </div>
+          </div>
+
+          <hr />
+
+          {/* Poster shortcut */}
+          <div>
+            <p className="mb-3 font-semibold flex items-center gap-2 text-amber-700">
+              <ImageIcon className="h-4 w-4 text-amber-500" /> Shortcut 3 — Poster / Flyer (share image)
+            </p>
+            <ol className="space-y-3">
+              {posterSteps.map(({ step, label, url, urlKey }) => (
+                <li key={step} className="flex gap-3">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">{step}</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground leading-snug">{label}</span>
+                    {url && (
+                      <div className="flex items-center gap-2">
+                        <code className="block rounded bg-muted px-2 py-1 text-xs break-all font-mono flex-1">{url}</code>
+                        <button
+                          onClick={() => copy(url, urlKey!)}
+                          className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-muted"
+                        >
+                          {copied === urlKey ? "✓" : "Copy"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-3 rounded-md bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">
+              <strong>To use:</strong> Share a flyer or poster image → run "Poster → FamilyOps" → it OCRs the image, finds the date, and creates a task or calendar event.
             </div>
           </div>
 

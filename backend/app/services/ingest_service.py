@@ -210,6 +210,11 @@ async def _extract_text_via_ocr(path: Path) -> List[Dict[str, Any]]:
         return [{"page": 1, "text": ""}]
 
 
+async def extract_text_from_image(path: Path) -> List[Dict[str, Any]]:
+    """Public wrapper for OCR on a single image file."""
+    return await _extract_text_via_ocr(path)
+
+
 def _build_chunk_metadata(document: UploadedDocument, page: int, chunk_index: int) -> Dict[str, Any]:
     citation = f"{document.filename or document.id}"
     if page is not None:
