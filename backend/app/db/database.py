@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from sqlalchemy.pool import NullPool
 import asyncio
+import ssl
 from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 
 # ============================================================
@@ -32,15 +33,26 @@ IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 if not IS_SQLITE:
     # Strip sslmode from URL query string — asyncpg does not accept it
-    # as a keyword arg; we pass ssl=True via connect_args instead.
+    # as a keyword arg; we translate it into the SSL context asyncpg expects.
     _parsed = urlparse(DATABASE_URL)
     _qs = parse_qs(_parsed.query, keep_blank_values=True)
-    _need_ssl = _qs.pop("sslmode", ["disable"])[0] not in ("disable", "allow")
+    _ssl_mode = _qs.pop("sslmode", ["disable"])[0].strip().lower()
     _clean_query = urlencode({k: v[0] for k, v in _qs.items()})
     DATABASE_URL = urlunparse(_parsed._replace(query=_clean_query))
 
-    if _need_ssl:
-        _connect_args["ssl"] = True
+    if _ssl_mode in {"disable", "allow", "prefer"}:
+        _connect_args["ssl"] = False
+    elif _ssl_mode in {"require", "no-verify"}:
+        # Supabase's pooler can present a certificate chain that asyncpg's
+        # default verified TLS context rejects. "require" in Postgres means
+        # encrypted transport without certificate verification, so we mirror
+        # that behavior here.
+        _ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        _ssl_context.check_hostname = False
+        _ssl_context.verify_mode = ssl.CERT_NONE
+        _connect_args["ssl"] = _ssl_context
+    elif _ssl_mode in {"verify-ca", "verify-full"}:
+        _connect_args["ssl"] = ssl.create_default_context()
 
 # ============================================================
 # ENGINE (IMPORTANT FIXES HERE)
