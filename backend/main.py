@@ -20,6 +20,7 @@ from app.api.routes import (
     auth,
     tasks,
     grocery,
+    pantry,
     meals,
     reminders,
     calendar,
@@ -160,6 +161,7 @@ app.include_router(dashboard.router, prefix="/api/v1", dependencies=protected)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1", dependencies=protected)
 app.include_router(grocery.router, prefix="/api/v1", dependencies=protected)
+app.include_router(pantry.router, prefix="/api/v1", dependencies=protected)
 app.include_router(meals.router, prefix="/api/v1", dependencies=protected)
 app.include_router(reminders.router, prefix="/api/v1", dependencies=protected)
 app.include_router(calendar.router, prefix="/api/v1", dependencies=protected)

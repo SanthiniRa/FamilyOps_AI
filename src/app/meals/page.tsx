@@ -146,6 +146,7 @@ function summaryHasValues(summary: any) {
 export default function MealsPage() {
   const qc = useQueryClient();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [recipeForm, setRecipeForm] = useState({
     name: "",
     description: "",
@@ -170,8 +171,19 @@ export default function MealsPage() {
   });
 
   const generatePlan = useMutation({
-    mutationFn: () => mealsApi.generatePlan({ week_start: weekStart.toISOString(), preferences: {} }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["meal-plans"] }),
+    mutationFn: () => mealsApi.generatePlan({ week_start: selectedWeekKey, preferences: {} }),
+    onSuccess: () => {
+      setGenerateError(null);
+      qc.invalidateQueries({ queryKey: ["meal-plans"] });
+    },
+    onError: (error: any) => {
+      const detail =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to generate meal plan.";
+      setGenerateError(typeof detail === "string" ? detail : "Unable to generate meal plan.");
+    },
   });
 
   const createRecipe = useMutation({
@@ -236,6 +248,15 @@ export default function MealsPage() {
           {generatePlan.isPending ? "Generating..." : "Generate AI Plan"}
         </Button>
       </div>
+
+      {generateError && (
+        <Card className="border-red-200 bg-red-50/70">
+          <CardContent className="py-3">
+            <p className="text-sm font-medium text-red-900">Meal plan generation failed</p>
+            <p className="text-sm text-red-800">{generateError}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Week Navigator */}
       <Card>

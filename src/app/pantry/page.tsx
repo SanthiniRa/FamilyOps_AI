@@ -28,6 +28,7 @@ const CATEGORY_OPTIONS = [
 export default function PantryPage() {
   const qc = useQueryClient();
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     quantity: "1",
@@ -67,6 +68,7 @@ export default function PantryPage() {
         notes: form.notes.trim() || null,
       }),
     onSuccess: () => {
+      setCreateError(null);
       qc.invalidateQueries({ queryKey: ["pantry-items"] });
       qc.invalidateQueries({ queryKey: ["pantry-summary"] });
       qc.invalidateQueries({ queryKey: ["pantry-low-stock"] });
@@ -80,6 +82,14 @@ export default function PantryPage() {
         price_per_unit: "",
         notes: "",
       });
+    },
+    onError: (error: any) => {
+      const detail =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to add pantry item.";
+      setCreateError(typeof detail === "string" ? detail : "Unable to add pantry item.");
     },
   });
 
@@ -156,6 +166,11 @@ export default function PantryPage() {
               createItem.mutate();
             }}
           >
+            {createError && (
+              <div className="md:col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {createError}
+              </div>
+            )}
             <Input
               placeholder="Item name"
               value={form.name}

@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -84,7 +85,11 @@ async def get_auth_context(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        result = await db.execute(select(User).where(User.id == subject))
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.family_member))
+            .where(User.id == subject)
+        )
         user = result.scalar_one_or_none()
         if not user or user.is_active is False:
             raise HTTPException(
