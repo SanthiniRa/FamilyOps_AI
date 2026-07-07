@@ -22,33 +22,39 @@ const MEAL_COLORS: Record<string, string> = {
   dinner: "bg-indigo-50 border-indigo-200",
 };
 
-const DEFAULT_NUTRITION_SUMMARY = {
-  avg_calories: 0,
-  avg_protein_g: 0,
-  avg_carbs_g: 0,
-  avg_fat_g: 0,
-  avg_fiber_g: 0,
-  daily_avg_calories: 0,
-  daily_avg_protein_g: 0,
-  daily_avg_carbs_g: 0,
-  daily_avg_fat_g: 0,
-  daily_avg_fiber_g: 0,
+const NUTRITION_FIELDS = ["calories", "protein", "carbs", "fat", "fiber"] as const;
+
+const DEFAULT_NUTRITION_BLOCK = {
+  calories: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
+  fiber: 0,
 };
 
-function normalizeNutritionSummary(value: any) {
+function emptyNutritionBlock() {
+  return { ...DEFAULT_NUTRITION_BLOCK };
+}
+
+function normalizeNutritionBlock(value: any) {
   if (!value || typeof value !== "object") {
-    return DEFAULT_NUTRITION_SUMMARY;
+    return emptyNutritionBlock();
   }
 
   return {
-    ...DEFAULT_NUTRITION_SUMMARY,
-    ...value,
+    calories: Number(value.calories ?? value.avg_calories ?? 0) || 0,
+    protein: Number(value.protein ?? value.avg_protein_g ?? 0) || 0,
+    carbs: Number(value.carbs ?? value.avg_carbs_g ?? 0) || 0,
+    fat: Number(value.fat ?? value.avg_fat_g ?? 0) || 0,
+    fiber: Number(value.fiber ?? value.avg_fiber_g ?? 0) || 0,
   };
 }
 
-function summarizeMeals(meals: Record<string, Record<string, string>> | undefined | null) {
-  const values = Object.values(meals || {}).flatMap((dayMeals) => Object.values(dayMeals || {}));
-  return values.filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+function normalizeMealCell(value: any) {
+  return {
+    name: typeof value?.name === "string" ? value.name : null,
+    ...normalizeNutritionBlock(value),
+  };
 }
 
 function estimateMealNutrition(mealName: string) {
@@ -94,53 +100,78 @@ function estimateMealNutrition(mealName: string) {
   return { calories, protein, carbs, fat, fiber };
 }
 
-function estimateNutritionFromMeals(meals: Record<string, Record<string, string>> | undefined | null) {
-  const mealNames = summarizeMeals(meals);
-  if (mealNames.length === 0) {
-    return DEFAULT_NUTRITION_SUMMARY;
-  }
+function addNutrition(target: Record<string, number>, source: Record<string, number>) {
+  NUTRITION_FIELDS.forEach((field) => {
+    target[field] = Math.round(((target[field] || 0) + (source[field] || 0)) * 100) / 100;
+  });
+}
 
-  const totals = mealNames.reduce(
-    (acc, mealName) => {
-      const estimated = estimateMealNutrition(mealName);
-      acc.calories += estimated.calories;
-      acc.protein += estimated.protein;
-      acc.carbs += estimated.carbs;
-      acc.fat += estimated.fat;
-      acc.fiber += estimated.fiber;
-      return acc;
-    },
-    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-  );
-
-  const count = mealNames.length;
+function normalizeDailyNutrition(value: any) {
   return {
-    avg_calories: Math.round((totals.calories / count) * 100) / 100,
-    avg_protein_g: Math.round((totals.protein / count) * 100) / 100,
-    avg_carbs_g: Math.round((totals.carbs / count) * 100) / 100,
-    avg_fat_g: Math.round((totals.fat / count) * 100) / 100,
-    avg_fiber_g: Math.round((totals.fiber / count) * 100) / 100,
-    daily_avg_calories: Math.round((totals.calories / count) * 100) / 100,
-    daily_avg_protein_g: Math.round((totals.protein / count) * 100) / 100,
-    daily_avg_carbs_g: Math.round((totals.carbs / count) * 100) / 100,
-    daily_avg_fat_g: Math.round((totals.fat / count) * 100) / 100,
-    daily_avg_fiber_g: Math.round((totals.fiber / count) * 100) / 100,
+    meals: MEALS.reduce((acc, meal) => {
+      acc[meal] = normalizeMealCell(value?.meals?.[meal]);
+      return acc;
+    }, {} as Record<string, { name: string | null; calories: number; protein: number; carbs: number; fat: number; fiber: number }>),
+    total: normalizeNutritionBlock(value?.total),
   };
 }
 
-function summaryHasValues(summary: any) {
-  return [
-    summary?.avg_calories,
-    summary?.avg_protein_g,
-    summary?.avg_carbs_g,
-    summary?.avg_fat_g,
-    summary?.avg_fiber_g,
-    summary?.daily_avg_calories,
-    summary?.daily_avg_protein_g,
-    summary?.daily_avg_carbs_g,
-    summary?.daily_avg_fat_g,
-    summary?.daily_avg_fiber_g,
-  ].some((value) => Number(value || 0) > 0);
+function buildFallbackNutritionBreakdown(meals: Record<string, Record<string, string>> | undefined | null) {
+  const days = DAYS.reduce((acc, day) => {
+    const dayMeals = meals?.[day] || {};
+    const total = emptyNutritionBlock();
+    const mealEntries = MEALS.reduce((mealAcc, meal) => {
+      const mealName = dayMeals?.[meal]?.trim?.() || dayMeals?.[meal] || "";
+      if (!mealName) {
+        mealAcc[meal] = { name: null, ...emptyNutritionBlock() };
+        return mealAcc;
+      }
+
+      const nutrition = estimateMealNutrition(String(mealName));
+      mealAcc[meal] = { name: String(mealName), ...nutrition };
+      addNutrition(total, nutrition);
+      return mealAcc;
+    }, {} as Record<string, { name: string | null; calories: number; protein: number; carbs: number; fat: number; fiber: number }>);
+
+    acc[day] = { meals: mealEntries, total };
+    return acc;
+  }, {} as Record<string, { meals: Record<string, { name: string | null; calories: number; protein: number; carbs: number; fat: number; fiber: number }>; total: { calories: number; protein: number; carbs: number; fat: number; fiber: number } }>);
+
+  const weeklyTotals = Object.values(days).reduce(
+    (acc, day) => {
+      addNutrition(acc, day.total);
+      return acc;
+    },
+    emptyNutritionBlock()
+  );
+
+  const mealCount = DAYS.length * MEALS.length;
+  const weeklyAveragePerMeal = {
+    calories: Math.round((weeklyTotals.calories / mealCount) * 100) / 100,
+    protein: Math.round((weeklyTotals.protein / mealCount) * 100) / 100,
+    carbs: Math.round((weeklyTotals.carbs / mealCount) * 100) / 100,
+    fat: Math.round((weeklyTotals.fat / mealCount) * 100) / 100,
+    fiber: Math.round((weeklyTotals.fiber / mealCount) * 100) / 100,
+  };
+
+  return { days, weekly_totals: weeklyTotals, weekly_average_per_meal: weeklyAveragePerMeal };
+}
+
+function normalizeNutritionBreakdown(value: any, meals: Record<string, Record<string, string>> | undefined | null) {
+  if (value && typeof value === "object" && value.days) {
+    const normalizedDays = DAYS.reduce((acc, day) => {
+      acc[day] = normalizeDailyNutrition(value.days?.[day]);
+      return acc;
+    }, {} as Record<string, ReturnType<typeof normalizeDailyNutrition>>);
+
+    return {
+      days: normalizedDays,
+      weekly_totals: normalizeNutritionBlock(value.weekly_totals),
+      weekly_average_per_meal: normalizeNutritionBlock(value.weekly_average_per_meal),
+    };
+  }
+
+  return buildFallbackNutritionBreakdown(meals);
 }
 
 export default function MealsPage() {
@@ -230,11 +261,8 @@ export default function MealsPage() {
     if (!p.week_start) return false;
     return new Date(p.week_start).toISOString().slice(0, 10) === selectedWeekKey;
   });
-  const normalizedNutritionSummary = normalizeNutritionSummary(currentPlan?.nutritional_summary);
-  const nutritionSummary = summaryHasValues(normalizedNutritionSummary)
-    ? normalizedNutritionSummary
-    : estimateNutritionFromMeals(currentPlan?.meals);
-  const nutritionIsEstimated = currentPlan && !summaryHasValues(normalizedNutritionSummary) && summaryHasValues(nutritionSummary);
+  const nutritionSummary = normalizeNutritionBreakdown(currentPlan?.nutritional_summary, currentPlan?.meals);
+  const nutritionIsEstimated = !(currentPlan?.nutritional_summary?.days);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -325,23 +353,53 @@ export default function MealsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <CardTitle className="text-base">Nutritional Summary (avg/day)</CardTitle>
+              <CardTitle className="text-base">Nutrition by Meal and Day</CardTitle>
               {nutritionIsEstimated && <Badge variant="outline" className="text-xs">Estimated</Badge>}
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { label: "Calories", value: nutritionSummary.avg_calories, unit: "kcal", color: "text-orange-600" },
-                { label: "Protein", value: nutritionSummary.avg_protein_g, unit: "g", color: "text-blue-600" },
-                { label: "Carbs", value: nutritionSummary.avg_carbs_g, unit: "g", color: "text-yellow-600" },
-                { label: "Fat", value: nutritionSummary.avg_fat_g, unit: "g", color: "text-red-600" },
+                { label: "Weekly calories", value: nutritionSummary.weekly_totals.calories, unit: "kcal", color: "text-orange-600" },
+                { label: "Weekly protein", value: nutritionSummary.weekly_totals.protein, unit: "g", color: "text-blue-600" },
+                { label: "Weekly carbs", value: nutritionSummary.weekly_totals.carbs, unit: "g", color: "text-yellow-600" },
+                { label: "Weekly fat", value: nutritionSummary.weekly_totals.fat, unit: "g", color: "text-red-600" },
               ].map((n) => (
-                <div key={n.label} className="text-center">
+                <div key={n.label} className="rounded-lg border bg-background p-3 text-center">
                   <p className={cn("text-2xl font-bold", n.color)}>{n.value}</p>
                   <p className="text-xs text-muted-foreground">{n.label} ({n.unit})</p>
                 </div>
               ))}
+            </div>
+
+            <div className="grid gap-3">
+              {DAYS.map((day) => {
+                const dayNutrition = nutritionSummary.days?.[day] ?? normalizeDailyNutrition(undefined);
+                return (
+                  <div key={day} className="rounded-lg border p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="font-semibold capitalize">{day}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Total: {dayNutrition.total.calories} kcal | {dayNutrition.total.protein}g protein | {dayNutrition.total.carbs}g carbs
+                      </p>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {MEALS.map((meal) => {
+                        const mealNutrition = dayNutrition.meals?.[meal] ?? normalizeMealCell(undefined);
+                        return (
+                          <div key={meal} className="rounded-md border bg-muted/30 p-3 text-sm">
+                            <p className="mb-1 capitalize font-medium">{meal}</p>
+                            <p className="leading-tight">{mealNutrition.name ?? "—"}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {mealNutrition.calories} kcal | {mealNutrition.protein}g protein
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

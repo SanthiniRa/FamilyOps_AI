@@ -20,64 +20,66 @@ planner = MealPlanningService()
 router = APIRouter(prefix="/meals", tags=["meals"])
 
 
-def _default_nutrition_summary() -> Dict[str, Any]:
+def _nutrition_template() -> Dict[str, float]:
     return {
-        "avg_calories": 0,
-        "avg_protein_g": 0,
-        "avg_carbs_g": 0,
-        "avg_fat_g": 0,
-        "avg_fiber_g": 0,
-        "daily_avg_calories": 0,
-        "daily_avg_protein_g": 0,
-        "daily_avg_carbs_g": 0,
-        "daily_avg_fat_g": 0,
-        "daily_avg_fiber_g": 0,
+        "calories": 0,
+        "protein": 0,
+        "carbs": 0,
+        "fat": 0,
+        "fiber": 0,
     }
 
 
-def _normalize_nutrition_summary(value: Any) -> Dict[str, Any]:
-    if not isinstance(value, dict):
-        return _default_nutrition_summary()
-
-    weekly_average = value.get("weekly_average")
-    source = weekly_average if isinstance(weekly_average, dict) else value
-
-    normalized = _default_nutrition_summary()
-    normalized["avg_calories"] = source.get("avg_calories", source.get("calories", 0)) or 0
-    normalized["avg_protein_g"] = source.get("avg_protein_g", source.get("protein_g", source.get("protein", 0))) or 0
-    normalized["avg_carbs_g"] = source.get("avg_carbs_g", source.get("carbs_g", source.get("carbs", 0))) or 0
-    normalized["avg_fat_g"] = source.get("avg_fat_g", source.get("fat_g", source.get("fat", 0))) or 0
-    normalized["avg_fiber_g"] = source.get("avg_fiber_g", source.get("fiber_g", source.get("fiber", 0))) or 0
-    normalized["daily_avg_calories"] = source.get("daily_avg_calories", normalized["avg_calories"]) or 0
-    normalized["daily_avg_protein_g"] = source.get("daily_avg_protein_g", normalized["avg_protein_g"]) or 0
-    normalized["daily_avg_carbs_g"] = source.get("daily_avg_carbs_g", normalized["avg_carbs_g"]) or 0
-    normalized["daily_avg_fat_g"] = source.get("daily_avg_fat_g", normalized["avg_fat_g"]) or 0
-    normalized["daily_avg_fiber_g"] = source.get("daily_avg_fiber_g", normalized["avg_fiber_g"]) or 0
-    return normalized
+def _meal_order() -> List[str]:
+    return ["breakfast", "lunch", "dinner"]
 
 
-def _summary_has_values(summary: Dict[str, Any]) -> bool:
-    return any(
-        summary.get(key, 0)
-        for key in (
-            "avg_calories",
-            "avg_protein_g",
-            "avg_carbs_g",
-            "avg_fat_g",
-            "avg_fiber_g",
-            "daily_avg_calories",
-            "daily_avg_protein_g",
-            "daily_avg_carbs_g",
-            "daily_avg_fat_g",
-            "daily_avg_fiber_g",
-        )
-    )
+def _empty_meal_nutrition(meal_name: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "name": meal_name,
+        **_nutrition_template(),
+    }
+
+
+def _empty_day_nutrition() -> Dict[str, Any]:
+    return {
+        "meals": {meal: _empty_meal_nutrition() for meal in _meal_order()},
+        "total": _nutrition_template(),
+    }
+
+
+def _resolve_meal_nutrition(recipe_map: Dict[str, Recipe], meal_name: str) -> Dict[str, float]:
+    recipe = recipe_map.get(meal_name)
+    if recipe:
+        nutrition = recipe.nutrition or {}
+        if not any((nutrition.get("calories"), nutrition.get("protein"), nutrition.get("carbs"), nutrition.get("fat"), nutrition.get("fiber"))):
+            nutrition = planner._estimate_recipe_nutrition(recipe)
+        return {
+            "calories": round(float(nutrition.get("calories", 0) or 0), 2),
+            "protein": round(float(nutrition.get("protein", 0) or 0), 2),
+            "carbs": round(float(nutrition.get("carbs", 0) or 0), 2),
+            "fat": round(float(nutrition.get("fat", 0) or 0), 2),
+            "fiber": round(float(nutrition.get("fiber", 0) or 0), 2),
+        }
+
+    nutrition = planner._estimate_meal_name_nutrition(meal_name)
+    return {
+        "calories": round(float(nutrition.get("calories", 0) or 0), 2),
+        "protein": round(float(nutrition.get("protein", 0) or 0), 2),
+        "carbs": round(float(nutrition.get("carbs", 0) or 0), 2),
+        "fat": round(float(nutrition.get("fat", 0) or 0), 2),
+        "fiber": round(float(nutrition.get("fiber", 0) or 0), 2),
+    }
+
+
+def _add_totals(target: Dict[str, float], nutrition: Dict[str, float]) -> None:
+    for key in ("calories", "protein", "carbs", "fat", "fiber"):
+        target[key] = round(float(target.get(key, 0) or 0) + float(nutrition.get(key, 0) or 0), 2)
 
 
 async def _resolve_nutrition_summary(db: AsyncSession, meals: Dict[str, Any], stored_summary: Any) -> Dict[str, Any]:
-    normalized = _normalize_nutrition_summary(stored_summary)
-    if _summary_has_values(normalized):
-        return normalized
+    if isinstance(stored_summary, dict) and stored_summary.get("days"):
+        return stored_summary
 
     meal_names = [
         str(meal_name).strip()
@@ -86,59 +88,67 @@ async def _resolve_nutrition_summary(db: AsyncSession, meals: Dict[str, Any], st
         if str(meal_name or "").strip()
     ]
     if not meal_names:
-        return normalized
+        return {
+            "days": {},
+            "weekly_totals": _nutrition_template(),
+            "weekly_average_per_meal": _nutrition_template(),
+        }
 
-    result = await db.execute(
-        select(Recipe).where(Recipe.name.in_(meal_names))
-    )
+    result = await db.execute(select(Recipe).where(Recipe.name.in_(meal_names)))
     recipes = result.scalars().all()
-    recipe_map = {
-        getattr(r, "name", None): r
-        for r in recipes
-        if getattr(r, "name", None)
+    recipe_map = {getattr(r, "name", None): r for r in recipes if getattr(r, "name", None)}
+
+    days: Dict[str, Any] = {}
+    weekly_totals = _nutrition_template()
+    meal_type_totals = {meal: _nutrition_template() for meal in _meal_order()}
+    meal_type_counts = {meal: 0 for meal in _meal_order()}
+    meal_count = 0
+
+    for day_name in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
+        day_meals = (meals or {}).get(day_name, {}) or {}
+        day_entry = _empty_day_nutrition()
+
+        for meal_type in _meal_order():
+            meal_name = str(day_meals.get(meal_type) or "").strip()
+            if not meal_name:
+                continue
+
+            nutrition = _resolve_meal_nutrition(recipe_map, meal_name)
+            day_entry["meals"][meal_type] = {
+                "name": meal_name,
+                **nutrition,
+            }
+            _add_totals(day_entry["total"], nutrition)
+            _add_totals(weekly_totals, nutrition)
+            _add_totals(meal_type_totals[meal_type], nutrition)
+            meal_type_counts[meal_type] += 1
+            meal_count += 1
+
+        days[day_name] = day_entry
+
+    meal_type_averages = {
+        meal_type: (
+            {
+                key: round(float(values.get(key, 0) or 0) / meal_type_counts[meal_type], 2)
+                for key in ("calories", "protein", "carbs", "fat", "fiber")
+            }
+            if meal_type_counts[meal_type]
+            else _nutrition_template()
+        )
+        for meal_type, values in meal_type_totals.items()
     }
 
-    totals = {
-        "avg_calories": 0,
-        "avg_protein_g": 0,
-        "avg_carbs_g": 0,
-        "avg_fat_g": 0,
-        "avg_fiber_g": 0,
+    weekly_average_per_meal = {
+        key: round(float(weekly_totals.get(key, 0) or 0) / meal_count, 2) if meal_count else 0
+        for key in ("calories", "protein", "carbs", "fat", "fiber")
     }
-    count = 0
 
-    for meal_name in meal_names:
-        recipe = recipe_map.get(meal_name)
-        if recipe:
-            nutrition = recipe.nutrition or {}
-            if not any((nutrition.get("calories"), nutrition.get("protein"), nutrition.get("carbs"), nutrition.get("fat"), nutrition.get("fiber"))):
-                nutrition = planner._estimate_recipe_nutrition(recipe)
-        else:
-            nutrition = planner._estimate_meal_name_nutrition(meal_name)
-
-        totals["avg_calories"] += nutrition.get("calories", 0) or 0
-        totals["avg_protein_g"] += nutrition.get("protein", 0) or 0
-        totals["avg_carbs_g"] += nutrition.get("carbs", 0) or 0
-        totals["avg_fat_g"] += nutrition.get("fat", 0) or 0
-        totals["avg_fiber_g"] += nutrition.get("fiber", 0) or 0
-        count += 1
-
-    if count == 0:
-        return normalized
-
-    estimated = {
-        "avg_calories": round(totals["avg_calories"] / count, 2),
-        "avg_protein_g": round(totals["avg_protein_g"] / count, 2),
-        "avg_carbs_g": round(totals["avg_carbs_g"] / count, 2),
-        "avg_fat_g": round(totals["avg_fat_g"] / count, 2),
-        "avg_fiber_g": round(totals["avg_fiber_g"] / count, 2),
+    return {
+        "days": days,
+        "weekly_totals": weekly_totals,
+        "weekly_average_per_meal": weekly_average_per_meal,
+        "meal_type_averages": meal_type_averages,
     }
-    estimated["daily_avg_calories"] = estimated["avg_calories"]
-    estimated["daily_avg_protein_g"] = estimated["avg_protein_g"]
-    estimated["daily_avg_carbs_g"] = estimated["avg_carbs_g"]
-    estimated["daily_avg_fat_g"] = estimated["avg_fat_g"]
-    estimated["daily_avg_fiber_g"] = estimated["avg_fiber_g"]
-    return estimated
 
 
 # ============================================================
@@ -323,7 +333,7 @@ async def generate_meal_plan(
     # 3. SAFE OUTPUT NORMALIZATION (CRITICAL)
     meals = result.get("meals", {})
     shopping_list = result.get("shopping_list", [])
-    nutrition = _normalize_nutrition_summary(result.get("nutrition_summary", {}))
+    nutrition = await _resolve_nutrition_summary(db, meals, result.get("nutrition_summary", {}))
     cost = result.get("estimated_cost", None)
     warnings = result.get("warnings", [])
 
