@@ -1,8 +1,8 @@
 """
-SMS Appointment Processor
-Reads an SmsMessage from the DB, uses Gemini AI to detect if it's an
-appointment/medical SMS, extracts structured details, then creates Tasks
-and CalendarEvents automatically.
+SMS Family Reminder Processor
+Reads an SmsMessage from the DB, uses Gemini AI to detect whether it is a
+family-relevant reminder, appointment, event, deadline, or other message
+that should become a task and/or calendar event automatically.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from app.tools.mcp_tools import MCPTools
 
 tools = MCPTools()
 
-# ── keyword hints that flag an SMS as appointment-related ──────────────────
-_APPT_KEYWORDS = (
+# ── keyword hints that flag an SMS as actionable/family-relevant ───────────
+_ACTIONABLE_KEYWORDS = (
     "appointment",
     "appt",
     "scheduled",
@@ -55,16 +55,48 @@ _APPT_KEYWORDS = (
     "vaccination",
     "prescription",
     "referral",
+    "deadline",
+    "due",
+    "due date",
+    "form",
+    "permission slip",
+    "school",
+    "class",
+    "teacher",
+    "pta",
+    "pto",
+    "assembly",
+    "concert",
+    "practice",
+    "practice session",
+    "match",
+    "game",
+    "pickup",
+    "drop off",
+    "dropoff",
+    "event",
+    "birthday",
+    "party",
+    "sale",
+    "market",
+    "meeting",
+    "trip",
+    "trip note",
+    "fee",
+    "payment",
+    "rsvp",
+    "register",
+    "registration",
 )
 
 
-def _looks_like_appointment(body: str) -> bool:
+def _looks_like_actionable(body: str) -> bool:
     lower = body.lower()
-    return any(kw in lower for kw in _APPT_KEYWORDS)
+    return any(kw in lower for kw in _ACTIONABLE_KEYWORDS)
 
 
 def _build_prompt(body: str, from_number: str, received_at: str) -> str:
-    return f"""You are a household assistant that reads SMS messages and extracts appointment information.
+    return f"""You are a household assistant that reads SMS messages and extracts family-relevant reminders.
 
 Analyse this SMS and return a JSON object only — no extra text.
 
@@ -80,16 +112,17 @@ Return this exact JSON shape:
   "appointment_date": "YYYY-MM-DDTHH:MM:SS or null (use current year if not specified)",
   "appointment_end": "YYYY-MM-DDTHH:MM:SS or null (default 30 min after start if unknown)",
   "location": "string or null",
-  "purpose": "brief description e.g. Annual checkup, Dental cleaning",
-  "task_title": "short imperative e.g. Attend dental appointment on Tue 3 Jul",
+  "purpose": "brief description e.g. Annual checkup, School assembly, Cake sale, Fee payment",
+  "task_title": "short imperative e.g. Attend dental appointment on Tue 3 Jul or Buy cake for school sale",
   "task_description": "one-sentence summary for the family task list",
-  "calendar_title": "short calendar title e.g. Dentist – Dr Smith",
+  "calendar_title": "short calendar title e.g. Dentist – Dr Smith or School Cake Sale",
   "needs_confirmation": true | false
 }}
 
 Rules:
-- Set is_appointment to false if the SMS is a marketing message, OTP, or clearly not medical.
-- If the date/time cannot be determined leave appointment_date null.
+- Set is_appointment to true if the SMS is a family-relevant reminder, appointment, event, deadline, school notice, payment notice, pickup/dropoff note, or anything time/date constrained that the family should remember or act on.
+- Set is_appointment to false only if the SMS is marketing, OTP, spam, or clearly not actionable.
+- If the date/time cannot be determined leave appointment_date null, but still keep is_appointment true for actionable reminders.
 - Never include PII beyond what is already in the SMS.
 """
 
@@ -117,7 +150,7 @@ async def _call_gemini(prompt: str) -> Optional[Dict[str, Any]]:
 
 
 async def process_single_sms(sms: SmsMessage, db: AsyncSession) -> None:
-    """Extract appointment info and persist tasks / calendar events."""
+    """Extract actionable reminder info and persist tasks / calendar events."""
 
     received_at = (sms.created_at or datetime.now(timezone.utc)).isoformat()
     prompt = _build_prompt(sms.body, sms.from_number, received_at)
@@ -125,14 +158,19 @@ async def process_single_sms(sms: SmsMessage, db: AsyncSession) -> None:
 
     if data is None:
         # Gemini unavailable — fall back to keyword match only
-        sms.is_appointment = _looks_like_appointment(sms.body)
+        sms.is_appointment = _looks_like_actionable(sms.body)
         sms.processed = True
         sms.processed_at = datetime.now(timezone.utc)
         db.add(sms)
         await db.commit()
         return
 
-    is_appointment: bool = bool(data.get("is_appointment", False))
+    is_appointment: bool = bool(
+        data.get("is_appointment", False)
+        or data.get("needs_confirmation", False)
+        or data.get("appointment_date")
+        or data.get("appointment_end")
+    )
     sms.is_appointment = is_appointment
     sms.extracted_data = data
 
