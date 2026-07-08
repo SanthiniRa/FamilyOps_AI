@@ -314,21 +314,29 @@ async def list_agent_runs(
     agent_name: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
-    q = select(AgentRun)
-    if agent_name:
-        q = q.where(AgentRun.agent_name == agent_name)
-    q = q.order_by(AgentRun.started_at.desc()).limit(limit)
-    result = await db.execute(q)
-    runs = result.scalars().all()
-    return [
-        {
-            "id": r.id, "agent_name": r.agent_name, "workflow_id": r.workflow_id,
-            "status": r.status, "tokens_used": r.tokens_used,
-            "duration_ms": r.duration_ms, "started_at": r.started_at,
-            "completed_at": r.completed_at,
-        }
-        for r in runs
-    ]
+    try:
+        q = select(AgentRun)
+        if agent_name:
+            q = q.where(AgentRun.agent_name == agent_name)
+        q = q.order_by(AgentRun.started_at.desc()).limit(limit)
+        result = await db.execute(q)
+        runs = result.scalars().all()
+        return [
+            {
+                "id": r.id,
+                "agent_name": r.agent_name,
+                "workflow_id": r.workflow_id,
+                "status": r.status,
+                "tokens_used": int(r.tokens_used or 0),
+                "duration_ms": int(r.duration_ms) if r.duration_ms is not None else None,
+                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            }
+            for r in runs
+        ]
+    except Exception as exc:
+        logger.exception("agent.list_runs_failed", error=str(exc))
+        return []
 
 
 @router.get("/runs/{run_id}")
@@ -348,20 +356,49 @@ async def get_agent_run(run_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/stats")
 async def agent_stats(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(AgentRun))
-    runs = result.scalars().all()
-    return {
-        "total_runs": len(runs),
-        "by_status": {
-            status: sum(1 for r in runs if r.status == status)
-            for status in ["running", "completed", "failed"]
-        },
-        "total_tokens": sum(r.tokens_used or 0 for r in runs),
-        "avg_duration_ms": (
-            sum(r.duration_ms or 0 for r in runs if r.duration_ms) /
-            max(1, sum(1 for r in runs if r.duration_ms))
-        ),
-    }
+    try:
+        result = await db.execute(select(AgentRun))
+        runs = result.scalars().all()
+        duration_values = []
+        total_tokens = 0
+
+        for run in runs:
+            try:
+                total_tokens += int(run.tokens_used or 0)
+            except (TypeError, ValueError):
+                continue
+
+            if run.duration_ms is not None:
+                try:
+                    duration_values.append(float(run.duration_ms))
+                except (TypeError, ValueError):
+                    continue
+
+        return {
+            "total_runs": len(runs),
+            "by_status": {
+                status: sum(1 for r in runs if r.status == status)
+                for status in ["running", "completed", "failed"]
+            },
+            "total_tokens": total_tokens,
+            "avg_duration_ms": (
+                sum(duration_values) / len(duration_values)
+                if duration_values
+                else 0
+            ),
+        }
+    except Exception as exc:
+        logger.exception("agent.stats_failed", error=str(exc))
+        return {
+            "total_runs": 0,
+            "by_status": {
+                "running": 0,
+                "completed": 0,
+                "failed": 0,
+            },
+            "total_tokens": 0,
+            "avg_duration_ms": 0,
+        }
 
 
 @router.websocket("/ws")

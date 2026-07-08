@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { smsApi } from "@/lib/api";
+import { getSmsShortcutEndpoint, smsApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -441,7 +441,7 @@ export default function MessagesPage() {
 
       {/* setup guide */}
       <SetupGuide
-        endpoint={`${typeof window !== "undefined" ? window.location.origin : ""}/api/v1/sms/shortcut`}
+        endpoint={getSmsShortcutEndpoint()}
         instructions={instructions}
       />
 

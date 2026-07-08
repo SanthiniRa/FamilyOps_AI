@@ -170,11 +170,20 @@ class ActivitySearchService:
                     domain=domain,
                     variant=variant,
                 )
-                payload = await web_search_service.search(
-                    scoped_query,
-                    max_results=per_domain_limit,
-                    fetch_pages=True,
-                )
+                try:
+                    payload = await web_search_service.search(
+                        scoped_query,
+                        max_results=per_domain_limit,
+                        fetch_pages=True,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "activity_search.site_query_failed",
+                        domain=domain,
+                        variant=variant,
+                        error=str(exc),
+                    )
+                    continue
                 results = self._filter_allowed_web_items(payload.get("results") or [], [domain])
                 pages = self._filter_allowed_web_items(payload.get("pages") or [], [domain])
                 logger.info(

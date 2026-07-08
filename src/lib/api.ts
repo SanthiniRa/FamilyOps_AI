@@ -2,6 +2,14 @@ import axios from "axios";
 
 export const AUTH_TOKEN_KEY = "familyops_api_token";
 
+export const getBackendBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return "";
+};
+
 const getApiToken = () => {
   const envToken = process.env.NEXT_PUBLIC_API_BEARER_TOKEN;
 
@@ -37,7 +45,7 @@ export const clearStoredAuthToken = () => {
 };
 
 const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: getBackendBaseUrl() ? `${getBackendBaseUrl()}/api/v1` : "/api/v1",
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
@@ -175,6 +183,11 @@ export const smsApi = {
   shortcut: (payload: { text: string; source: string; sender?: string; token?: string }) =>
     api.post("/sms/shortcut", payload),
   instructions: () => api.get("/sms/shortcut-instructions"),
+};
+
+export const getSmsShortcutEndpoint = () => {
+  const baseUrl = getBackendBaseUrl();
+  return baseUrl ? `${baseUrl}/api/v1/sms/shortcut` : "/api/v1/sms/shortcut";
 };
 
 export const authApi = {
