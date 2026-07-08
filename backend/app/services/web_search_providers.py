@@ -110,6 +110,71 @@ class _DuckDuckGoResultParser(HTMLParser):
             self._capture_buffer = []
 
 
+class _DuckDuckGoLiteResultParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.results: List[Dict[str, Any]] = []
+        self._capture_kind: Optional[str] = None
+        self._capture_buffer: List[str] = []
+        self._current_result: Optional[Dict[str, Any]] = None
+
+    def handle_starttag(self, tag: str, attrs):  # type: ignore[override]
+        attr_map = dict(attrs)
+        class_value = attr_map.get("class", "") or ""
+        class_tokens = set(class_value.split())
+        href = attr_map.get("href", "") or ""
+
+        if tag == "a" and (
+            "result-link" in class_tokens
+            or "result__a" in class_tokens
+            or ("nofollow" in (attr_map.get("rel", "") or "").split() and href)
+        ):
+            normalized = _normalize_result_url(href)
+            if not normalized:
+                return
+            self._current_result = {
+                "title": "",
+                "url": normalized,
+                "domain": urlparse(normalized).netloc,
+                "snippet": "",
+                "source": "duckduckgo",
+            }
+            self._capture_kind = "title"
+            self._capture_buffer = []
+            return
+
+        if self._current_result and (
+            "result-snippet" in class_tokens
+            or "result__snippet" in class_tokens
+            or any(token.startswith("result-snippet") for token in class_tokens)
+            or any(token.startswith("result__snippet") for token in class_tokens)
+        ):
+            self._capture_kind = "snippet"
+            self._capture_buffer = []
+
+    def handle_data(self, data: str) -> None:
+        if self._capture_kind:
+            self._capture_buffer.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._capture_kind == "title" and tag == "a":
+            title = _clean_text("".join(self._capture_buffer))
+            if self._current_result is not None:
+                self._current_result["title"] = title
+                if title:
+                    self.results.append(self._current_result)
+            self._capture_kind = None
+            self._capture_buffer = []
+            return
+
+        if self._capture_kind == "snippet" and tag in {"div", "span", "a", "p"}:
+            snippet = _clean_text("".join(self._capture_buffer))
+            if self._current_result is not None:
+                self._current_result["snippet"] = snippet
+            self._capture_kind = None
+            self._capture_buffer = []
+
+
 def _page_excerpt(html: str, max_chars: int = 700) -> Dict[str, str]:
     title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.I | re.S)
     description_match = re.search(
@@ -161,18 +226,17 @@ class DuckDuckGoSearchProvider(WebSearchProvider):
         params = {"q": query, "kl": "us-en"}
         headers = {"User-Agent": self.user_agent}
 
-        response_text = await retry_async(
-            lambda: self._request_text(
-                "https://html.duckduckgo.com/html/",
-                params=params,
-                headers=headers,
-            ),
-            retry_settings=self.retry_settings,
-            operation_name="web_search",
-        )
-
         parser = _DuckDuckGoResultParser()
-        parser.feed(response_text)
+        response_text = await self._search_html(params=params, headers=headers)
+        if response_text:
+            parser.feed(response_text)
+
+        if not parser.results:
+            lite_text = await self._search_lite(params=params, headers=headers)
+            if lite_text:
+                lite_parser = _DuckDuckGoLiteResultParser()
+                lite_parser.feed(lite_text)
+                parser.results.extend(lite_parser.results)
 
         cleaned: List[Dict[str, Any]] = []
         seen_urls: set[str] = set()
@@ -194,6 +258,40 @@ class DuckDuckGoSearchProvider(WebSearchProvider):
                 break
 
         return cleaned
+
+    async def _search_html(self, *, params: Dict[str, Any], headers: Dict[str, str]) -> str:
+        try:
+            return await retry_async(
+                lambda: self._request_text(
+                    "https://html.duckduckgo.com/html/",
+                    params=params,
+                    headers=headers,
+                ),
+                retry_settings=self.retry_settings,
+                operation_name="web_search",
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None and exc.response.status_code == 403:
+                logger.warning("web_search.duckduckgo_html_forbidden")
+                return ""
+            raise
+
+    async def _search_lite(self, *, params: Dict[str, Any], headers: Dict[str, str]) -> str:
+        try:
+            return await retry_async(
+                lambda: self._request_text(
+                    "https://lite.duckduckgo.com/lite/",
+                    params=params,
+                    headers=headers,
+                ),
+                retry_settings=self.retry_settings,
+                operation_name="web_search",
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None and exc.response.status_code == 403:
+                logger.warning("web_search.duckduckgo_lite_forbidden")
+                return ""
+            raise
 
     async def _request_text(
         self,

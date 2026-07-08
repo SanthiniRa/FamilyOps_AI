@@ -2,6 +2,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import httpx
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -73,6 +75,31 @@ def test_duckduckgo_parser_skips_ad_click_links():
     assert len(parser.results) == 1
     assert parser.results[0]["title"] == "Example Title"
     assert parser.results[0]["url"] == "https://example.com"
+
+
+def test_duckduckgo_provider_falls_back_to_lite_on_html_403(monkeypatch):
+    provider = DuckDuckGoSearchProvider()
+
+    async def fake_request_text(url: str, *, params=None, headers=None):
+        if "html.duckduckgo.com" in url:
+            response = type("Resp", (), {"status_code": 403})()
+            raise httpx.HTTPStatusError("forbidden", request=None, response=response)
+        return """
+        <div class="result">
+          <a rel="nofollow" class="result-link" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Ffamily">
+            Family Event
+          </a>
+          <div class="result-snippet">Great for kids.</div>
+        </div>
+        """
+
+    monkeypatch.setattr(provider, "_request_text", fake_request_text)
+
+    result = asyncio.run(provider.search("family activities London", max_results=5))
+
+    assert len(result) == 1
+    assert result[0]["url"] == "https://example.com/family"
+    assert result[0]["title"] == "Family Event"
 
 
 def test_page_excerpt_extracts_metadata():

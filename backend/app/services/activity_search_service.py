@@ -165,6 +165,11 @@ class ActivitySearchService:
         for domain in domains:
             for variant in query_variants:
                 scoped_query = f"site:{domain} {variant}".strip()
+                logger.info(
+                    "activity_search.site_query",
+                    domain=domain,
+                    variant=variant,
+                )
                 payload = await web_search_service.search(
                     scoped_query,
                     max_results=per_domain_limit,
@@ -172,6 +177,13 @@ class ActivitySearchService:
                 )
                 results = self._filter_allowed_web_items(payload.get("results") or [], [domain])
                 pages = self._filter_allowed_web_items(payload.get("pages") or [], [domain])
+                logger.info(
+                    "activity_search.site_query_results",
+                    domain=domain,
+                    variant=variant,
+                    results=len(results),
+                    pages=len(pages),
+                )
                 combined_results.extend(results)
                 combined_pages.extend(pages)
                 if results or pages:
