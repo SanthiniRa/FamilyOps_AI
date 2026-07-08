@@ -406,7 +406,15 @@ function formatCreatedResource(resource: any): string {
     return "Created a meal plan for the requested week.";
   }
   if (resource.type === "activity_search" || resource.type === "event_search") {
-    return `Found ${resource.results?.length ?? 0} activity options.`;
+    const structuredCount = resource.results?.length ?? 0;
+    const pageCount = resource.pages?.length ?? 0;
+    if (pageCount > 0 && structuredCount === 0) {
+      return `Found ${pageCount} likely pages to review.`;
+    }
+    if (pageCount > 0) {
+      return `Found ${structuredCount} activity options and ${pageCount} likely pages.`;
+    }
+    return `Found ${structuredCount} activity options.`;
   }
   return "";
 }
@@ -429,6 +437,7 @@ function renderResource(resource: any) {
 
 function renderActivityResource(resource: any) {
   const results = Array.isArray(resource.results) ? resource.results.slice(0, 5) : [];
+  const pages = Array.isArray(resource.pages) ? resource.pages.slice(0, 5) : [];
 
   return (
     <div className="mt-3 rounded-2xl border bg-background/80 p-3">
@@ -477,7 +486,7 @@ function renderActivityResource(resource: any) {
                 </td>
               </tr>
             ))}
-            {results.length === 0 && (
+            {results.length === 0 && pages.length === 0 && (
               <tr>
                 <td className="px-2 py-3 text-sm text-muted-foreground" colSpan={7}>
                   No structured activity details were found.
@@ -487,6 +496,72 @@ function renderActivityResource(resource: any) {
           </tbody>
         </table>
       </div>
+
+      {pages.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Pages found
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[860px] border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="px-2 py-2 font-semibold">Page</th>
+                  <th className="px-2 py-2 font-semibold">Source</th>
+                  <th className="px-2 py-2 font-semibold">Date</th>
+                  <th className="px-2 py-2 font-semibold">Location</th>
+                  <th className="px-2 py-2 font-semibold">Price</th>
+                  <th className="px-2 py-2 font-semibold">Booking needed</th>
+                  <th className="px-2 py-2 font-semibold">Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pages.map((item: any, index: number) => {
+                  const title = item.page_title || item.title || "Untitled page";
+                  const source = item.domain || "not listed";
+                  const url = item.url || "";
+                  const snippet = item.page_description || item.page_excerpt || item.snippet || "not listed";
+                  return (
+                    <tr key={`${title}-${index}`} className="border-b last:border-b-0">
+                      <td className="px-2 py-3 align-top">
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">{title}</p>
+                          <p className="text-muted-foreground">{snippet}</p>
+                        </div>
+                      </td>
+                      <td className="px-2 py-3 align-top text-muted-foreground">{source}</td>
+                      <td className="px-2 py-3 align-top text-muted-foreground">Not listed</td>
+                      <td className="px-2 py-3 align-top text-muted-foreground">Not listed</td>
+                      <td className="px-2 py-3 align-top text-muted-foreground">Not listed</td>
+                      <td className="px-2 py-3 align-top text-muted-foreground">Not listed</td>
+                      <td className="px-2 py-3 align-top text-muted-foreground">
+                        {url ? (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="break-all text-primary hover:underline"
+                          >
+                            {url}
+                          </a>
+                        ) : (
+                          "Not listed"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {results.length === 0 && pages.length === 0 && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          No structured activity details were found.
+        </p>
+      )}
     </div>
   );
 }

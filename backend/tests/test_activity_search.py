@@ -57,6 +57,8 @@ def test_activity_search_merges_event_and_web_results(monkeypatch):
     assert result["sources"]["events"] is True
     assert result["sources"]["web"] is True
     assert len(result["results"]) == 2
+    assert len(result["pages"]) == 1
+    assert result["pages"][0]["domain"] == "example.com"
     assert result["results"][0]["source"] == "event_search"
     assert result["results"][0]["cost"] == "£10 to £20"
     assert result["results"][1]["source"] == "web_search"

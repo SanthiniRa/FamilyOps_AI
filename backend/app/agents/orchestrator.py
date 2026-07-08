@@ -166,9 +166,24 @@ def _activity_source_domains(message: str) -> Optional[List[str]]:
     return settings.activity_search_source_domains
 
 
-def _format_activity_reply(location: Optional[str], results: List[Dict[str, Any]]) -> str:
+def _format_activity_reply(
+    location: Optional[str],
+    results: List[Dict[str, Any]],
+    pages: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     area = location or "your area"
     if not results:
+        if pages:
+            lines = [f"No structured local family-friendly activities were found for {area}, but these pages may be helpful:"]
+            for idx, item in enumerate(pages[:8], start=1):
+                title = item.get("page_title") or item.get("title") or "Untitled page"
+                url = item.get("url") or ""
+                snippet = item.get("page_description") or item.get("page_excerpt") or item.get("snippet") or "not listed"
+                source = item.get("domain") or "not listed"
+                lines.append(
+                    f"{idx}. {title} - Source: {source} - Link: {url or 'not listed'} - Snippet: {snippet}"
+                )
+            return "\n".join(lines)
         return f"No local family-friendly activities were found for {area}."
 
     lines = [f"Family-friendly activities near {area}:"]
@@ -1023,7 +1038,8 @@ class FamilyOpsOrchestrator:
             return state
 
         results = activities.get("results") or []
-        context_text = _format_activity_reply(location, results)
+        pages = activities.get("pages") or []
+        context_text = _format_activity_reply(location, results, pages)
         reply = context_text
         state["reply"] = reply
         state["context"]["resource"] = {
@@ -1031,6 +1047,7 @@ class FamilyOpsOrchestrator:
             "query": message,
             "location": location,
             "results": results,
+            "pages": pages,
             "sources": activities.get("sources") or {},
             "search_query": activities.get("query", message),
         }

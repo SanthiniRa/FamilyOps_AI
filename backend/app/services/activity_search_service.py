@@ -55,6 +55,7 @@ class ActivitySearchService:
             raise ValueError("query is required")
 
         results: List[Dict[str, Any]] = []
+        pages: List[Dict[str, Any]] = []
         errors: List[str] = []
 
         event_payload = await self._safe_event_search(
@@ -75,13 +76,16 @@ class ActivitySearchService:
         )
         if web_payload:
             results.extend(self._normalize_web_results(web_payload))
+            pages.extend(self._normalize_web_pages(web_payload))
 
         deduped = self._dedupe_results(results)
+        deduped_pages = self._dedupe_web_items(pages)
 
         return {
             "query": normalized_query,
             "location": location,
             "results": deduped[:max_results],
+            "pages": deduped_pages[:max_results],
             "sources": {
                 "events": bool(event_payload),
                 "web": bool(web_payload),
@@ -230,6 +234,22 @@ class ActivitySearchService:
                 }
             )
         return normalized
+
+    def _normalize_web_pages(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        pages: List[Dict[str, Any]] = []
+        for item in payload.get("pages") or []:
+            pages.append(
+                {
+                    "title": item.get("page_title") or item.get("title") or "Untitled page",
+                    "url": item.get("url") or "",
+                    "domain": item.get("domain") or "",
+                    "snippet": item.get("page_description") or item.get("page_excerpt") or item.get("snippet") or "",
+                    "page_title": item.get("page_title") or item.get("title") or "Untitled page",
+                    "page_description": item.get("page_description") or "",
+                    "page_excerpt": item.get("page_excerpt") or "",
+                }
+            )
+        return pages
 
     def _dedupe_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         deduped: List[Dict[str, Any]] = []
