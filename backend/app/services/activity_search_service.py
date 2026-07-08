@@ -265,10 +265,14 @@ class ActivitySearchService:
 
         variants: List[str] = []
         terms = [
+            "family days out",
             "family activities",
             "kids activities",
+            "what's on",
             "days out",
+            "free family activities",
             "holiday activities",
+            "school holiday activities",
             "family events",
             "outdoor family activities",
         ]
@@ -277,10 +281,31 @@ class ActivitySearchService:
             if candidate and candidate not in variants:
                 variants.append(candidate)
 
+        interest_terms = [
+            "parks",
+            "museums",
+            "animals",
+            "festivals",
+            "outdoor fun",
+        ]
+        interest_candidate = " ".join(part for part in interest_terms if part in text)
+        if interest_candidate:
+            candidate = " ".join(part for part in [interest_candidate, location_value] if part).strip()
+            if candidate and candidate not in variants:
+                variants.append(candidate)
+
+        season_terms = []
+        if any(month in text for month in ["july", "august", "summer", "holiday", "holidays"]):
+            season_terms.extend(["summer holidays", "summer activities", "school holiday activities"])
+        for season_term in season_terms:
+            candidate = " ".join(part for part in [season_term, location_value] if part).strip()
+            if candidate and candidate not in variants:
+                variants.append(candidate)
+
         if location_value and location_value not in variants:
             variants.append(location_value)
 
-        return variants[:3] if variants else [query]
+        return variants[:6] if variants else [query]
 
     def _filter_allowed_web_items(self, items: List[Dict[str, Any]], domains: List[str]) -> List[Dict[str, Any]]:
         allowed = [self._normalize_domain(domain) for domain in domains if self._normalize_domain(domain)]

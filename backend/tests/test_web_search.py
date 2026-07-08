@@ -23,6 +23,15 @@ def test_normalize_result_url_decodes_duckduckgo_redirect():
     assert _normalize_result_url(url) == "https://example.com/page"
 
 
+def test_normalize_result_url_drops_duckduckgo_ads():
+    url = (
+        "https://duckduckgo.com/y.js?ad_domain=tripadvisor.com&ad_provider=bingv7aa"
+        "&ad_type=txad&click_metadata=abc&rut=123"
+    )
+
+    assert _normalize_result_url(url) == ""
+
+
 def test_duckduckgo_parser_extracts_result_title_and_snippet():
     html = """
     <div class="result">
@@ -40,6 +49,30 @@ def test_duckduckgo_parser_extracts_result_title_and_snippet():
     assert parser.results[0]["title"] == "Example Title"
     assert parser.results[0]["url"] == "https://example.com"
     assert "Example snippet" in parser.results[0]["snippet"]
+
+
+def test_duckduckgo_parser_skips_ad_click_links():
+    html = """
+    <div class="result">
+      <a rel="nofollow" class="result__a" href="https://duckduckgo.com/y.js?ad_domain=tripadvisor.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=abc&rut=123">
+        Sponsored result
+      </a>
+      <div class="result__snippet">Ad snippet.</div>
+    </div>
+    <div class="result">
+      <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com">
+        Example Title
+      </a>
+      <div class="result__snippet">Example snippet text.</div>
+    </div>
+    """
+
+    parser = _DuckDuckGoResultParser()
+    parser.feed(html)
+
+    assert len(parser.results) == 1
+    assert parser.results[0]["title"] == "Example Title"
+    assert parser.results[0]["url"] == "https://example.com"
 
 
 def test_page_excerpt_extracts_metadata():

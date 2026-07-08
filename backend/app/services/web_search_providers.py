@@ -30,12 +30,28 @@ def _normalize_result_url(url: str) -> str:
         url = f"https:{url}"
 
     parsed = urlparse(url)
+    if _is_duckduckgo_ad_url(parsed):
+        return ""
     if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith("/l/"):
         target = parse_qs(parsed.query).get("uddg", [])
         if target:
             return unquote(target[0])
 
     return unquote(url)
+
+
+def _is_duckduckgo_ad_url(parsed) -> bool:
+    host = (parsed.netloc or "").lower()
+    path = (parsed.path or "").lower()
+    query = (parsed.query or "").lower()
+    return host.endswith("duckduckgo.com") and (
+        path == "/y.js"
+        or path.startswith("/y.js/")
+        or "ad_domain=" in query
+        or "ad_provider=" in query
+        or "click_metadata=" in query
+        or "rut=" in query
+    )
 
 
 class _DuckDuckGoResultParser(HTMLParser):
