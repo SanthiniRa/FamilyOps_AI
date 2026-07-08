@@ -126,7 +126,17 @@ def _strip_trailing_date_clause(value: str) -> str:
             earliest = match.start()
     if earliest is not None:
         cleaned = cleaned[:earliest]
-    return cleaned.strip(" .,!?:;")
+    cleaned = cleaned.strip(" .,!?:;")
+    while True:
+        updated = re.sub(
+            r"\b(?:from|to|between|through|until|till|starting|starting on)\b\.?\s*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        ).strip(" .,!?:;")
+        if updated == cleaned:
+            return cleaned
+        cleaned = updated
 
 
 def _extract_location_from_message(message: str) -> Optional[str]:

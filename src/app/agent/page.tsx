@@ -557,11 +557,6 @@ function renderActivityResource(resource: any) {
         </div>
       )}
 
-      {results.length === 0 && pages.length === 0 && (
-        <p className="mt-3 text-sm text-muted-foreground">
-          No structured activity details were found.
-        </p>
-      )}
     </div>
   );
 }

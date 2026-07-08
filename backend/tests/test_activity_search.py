@@ -138,3 +138,9 @@ def test_extract_location_trims_date_range():
     )
 
     assert _extract_location_from_message(message) == "London"
+
+
+def test_extract_location_trims_trailing_from_without_date():
+    message = "Find family-friendly activities in London from."
+
+    assert _extract_location_from_message(message) == "London"

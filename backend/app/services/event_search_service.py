@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.core.config import settings
+from app.core.logging import logger
 from app.core.resilience import AsyncTTLCache, RetrySettings, retry_async
 
 
@@ -36,9 +37,25 @@ class EventSearchService:
         max_results: int = 10,
     ) -> Dict[str, Any]:
         if self.provider != "ticketmaster":
-            raise ValueError(f"Unsupported event provider: {self.provider}")
+            logger.warning("event_search.unsupported_provider", provider=self.provider)
+            return {
+                "provider": self.provider,
+                "query": query,
+                "location": location,
+                "postal_code": postal_code,
+                "family_friendly": family_friendly,
+                "results": [],
+            }
         if not self.ticketmaster_api_key:
-            raise ValueError("TICKETMASTER_API_KEY is required for event search")
+            logger.warning("event_search.missing_api_key")
+            return {
+                "provider": self.provider,
+                "query": query,
+                "location": location,
+                "postal_code": postal_code,
+                "family_friendly": family_friendly,
+                "results": [],
+            }
         if not any([query, location, postal_code]):
             raise ValueError("query, location, or postal_code is required")
 

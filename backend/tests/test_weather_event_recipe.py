@@ -209,6 +209,16 @@ def test_event_search_service_with_mocked_http(monkeypatch):
     assert result["results"][0]["name"] == "Kids Theatre"
 
 
+def test_event_search_service_without_api_key_returns_empty_results():
+    service = EventSearchService()
+    service.ticketmaster_api_key = ""
+
+    result = asyncio.run(service.search(query="family events", location="London", max_results=5))
+
+    assert result["provider"] == "ticketmaster"
+    assert result["results"] == []
+
+
 def test_extract_location_strips_weekend_words():
     assert _extract_location_from_message("What's the weather in London this weekend") == "London"
     assert _extract_location_from_message("Find family-friendly events near Buckinghamshire this weekend") == "Buckinghamshire"
