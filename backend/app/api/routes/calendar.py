@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.core.auth import get_optional_current_user
 from app.core.ownership import get_owner_family_member_id, metadata_matches_owner, with_owner_metadata
 from app.db.database import get_db
@@ -168,7 +168,7 @@ async def upcoming_week(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     week_end = now + timedelta(days=7)
     owner_family_member_id = get_owner_family_member_id(current_user)
     q = select(CalendarEvent).where(

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import or_, select
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.db.database import get_db
 from app.db.models import AgentRun, Task, CalendarEvent, GroceryList, GroceryItem, Reminder, Memory, MealPlan, FamilyMember, PantryItem, User
 from app.core.auth import get_optional_current_user
@@ -63,7 +63,7 @@ class AgentRequest(BaseModel):
 
 async def _fetch_db_context(db: AsyncSession, owner_family_member_id: Optional[str] = None) -> Dict[str, Any]:
     """Pre-fetch relevant household data to give the LLM real context."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     week_ahead = now + timedelta(days=7)
 
     # Tasks
@@ -284,7 +284,7 @@ async def chat_with_agent(
         }
         run.tokens_used = int(result.get("tokens_used") or 0)
         run.duration_ms = duration_ms
-        run.completed_at = datetime.utcnow()
+        run.completed_at = datetime.now(timezone.utc)
         await db.commit()
 
         return {
@@ -301,7 +301,7 @@ async def chat_with_agent(
         try:
             run.status = "failed"  # type: ignore[name-defined]
             run.error = str(e)  # type: ignore[name-defined]
-            run.completed_at = datetime.utcnow()  # type: ignore[name-defined]
+            run.completed_at = datetime.now(timezone.utc)  # type: ignore[name-defined]
             await db.commit()  # type: ignore[name-defined]
         except Exception:
             pass
