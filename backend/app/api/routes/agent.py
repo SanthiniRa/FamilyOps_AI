@@ -41,6 +41,21 @@ def _serialize_user(user: Optional[User]) -> Optional[Dict[str, Any]]:
     }
 
 
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except Exception:
+            pass
+    return str(value)
+
+
 class AgentRequest(BaseModel):
     message: str
     context: Dict[str, Any] = Field(default_factory=dict)
@@ -263,13 +278,14 @@ async def chat_with_agent(
 
         run.status = result.get("status", "completed")
         run.output_data = {
-            "reply": result.get("reply", ""),
-            "tools_called": result.get("tools_called", []),
-            "resource": result.get("context", {}).get("resource"),
+            "reply": _json_safe(result.get("reply", "")),
+            "tools_called": _json_safe(result.get("tools_called", [])),
+            "resource": _json_safe(result.get("context", {}).get("resource")),
         }
         run.tokens_used = int(result.get("tokens_used") or 0)
         run.duration_ms = duration_ms
         run.completed_at = datetime.utcnow()
+        await db.commit()
 
         return {
             "run_id": run.id,
@@ -286,6 +302,7 @@ async def chat_with_agent(
             run.status = "failed"  # type: ignore[name-defined]
             run.error = str(e)  # type: ignore[name-defined]
             run.completed_at = datetime.utcnow()  # type: ignore[name-defined]
+            await db.commit()  # type: ignore[name-defined]
         except Exception:
             pass
         raise HTTPException(status_code=500, detail=str(e))
