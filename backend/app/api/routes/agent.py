@@ -276,7 +276,7 @@ async def chat_with_agent(
             "status": run.status,
             "reply": result.get("reply", ""),
             "resource": result.get("context", {}).get("resource"),
-            "result": result,
+            "tools_called": result.get("tools_called", []),
             "tokens_used": run.tokens_used,
             "duration_ms": duration_ms,
         }

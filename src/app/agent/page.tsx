@@ -108,14 +108,13 @@ export default function AgentPage() {
         role: "agent",
         content:
           data.reply ||
-          data.result?.reply ||
-          formatCreatedResource(data.result?.context?.resource) ||
+          formatCreatedResource(data.resource) ||
           "Done! Check the relevant section for updates.",
         status: data.status,
-        agentUsed: data.result?.tools_called?.[0],
+        agentUsed: data.tools_called?.[0],
         durationMs: data.duration_ms,
-        tokensUsed: data.tokens_used ?? data.result?.tokens_used,
-        resource: data.result?.context?.resource,
+        tokensUsed: data.tokens_used,
+        resource: data.resource,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, agentMsg]);
@@ -131,7 +130,7 @@ export default function AgentPage() {
           id: Date.now().toString(),
           role: "agent",
           content:
-            "Sorry, I couldn't reach the backend. Make sure the Backend API workflow is running.",
+            "Sorry, the backend returned an error. Please check the Railway backend logs.",
           timestamp: new Date(),
         },
       ]);
