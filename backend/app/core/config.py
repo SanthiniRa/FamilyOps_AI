@@ -1,11 +1,54 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, DotEnvSettingsSource, EnvSettingsSource, PydanticBaseSettingsSource
 from pydantic import field_validator
-from typing import List
+from typing import Any, List
 from pathlib import Path
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_DIR.parent
+
+
+def _parse_activity_search_source_domains(value: Any) -> List[str]:
+    """
+    Accept comma, semicolon, newline, or JSON-style string lists for the
+    activity source allowlist.
+    """
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(item).strip().lower() for item in value if str(item).strip()]
+
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+
+        if raw.startswith("[") and raw.endswith("]"):
+            raw = raw[1:-1]
+
+        parts = []
+        for chunk in raw.replace(";", ",").replace("\n", ",").split(","):
+            cleaned = chunk.strip().strip('"').strip("'").lower()
+            if cleaned:
+                parts.append(cleaned)
+        return parts
+
+    return [str(value).strip().lower()] if str(value).strip() else []
+
+
+class FamilyOpsEnvSettingsSource(EnvSettingsSource):
+    def prepare_field_value(self, field_name, field, value, value_is_complex):
+        if field_name == "activity_search_source_domains" and isinstance(value, str):
+            return _parse_activity_search_source_domains(value)
+        return super().prepare_field_value(field_name, field, value, value_is_complex)
+
+
+class FamilyOpsDotEnvSettingsSource(DotEnvSettingsSource):
+    def prepare_field_value(self, field_name, field, value, value_is_complex):
+        if field_name == "activity_search_source_domains" and isinstance(value, str):
+            return _parse_activity_search_source_domains(value)
+        return super().prepare_field_value(field_name, field, value, value_is_complex)
 
 
 class Settings(BaseSettings):
@@ -198,32 +241,38 @@ class Settings(BaseSettings):
     @field_validator("activity_search_source_domains", mode="before")
     @classmethod
     def parse_activity_search_source_domains(cls, value):
-        """
-        Accept comma, semicolon, newline, or JSON-style string lists for the
-        activity source allowlist.
-        """
-        if value is None:
-            return value
+        return _parse_activity_search_source_domains(value)
 
-        if isinstance(value, list):
-            return [str(item).strip().lower() for item in value if str(item).strip()]
-
-        if isinstance(value, str):
-            raw = value.strip()
-            if not raw:
-                return []
-
-            if raw.startswith("[") and raw.endswith("]"):
-                raw = raw[1:-1]
-
-            parts = []
-            for chunk in raw.replace(";", ",").replace("\n", ",").split(","):
-                cleaned = chunk.strip().strip('"').strip("'").lower()
-                if cleaned:
-                    parts.append(cleaned)
-            return parts
-
-        return value
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ):
+        custom_env_settings = FamilyOpsEnvSettingsSource(
+            settings_cls,
+            case_sensitive=getattr(env_settings, "case_sensitive", None),
+            env_prefix=getattr(env_settings, "env_prefix", None),
+            env_nested_delimiter=getattr(env_settings, "env_nested_delimiter", None),
+            env_ignore_empty=getattr(env_settings, "env_ignore_empty", None),
+            env_parse_none_str=getattr(env_settings, "env_parse_none_str", None),
+            env_parse_enums=getattr(env_settings, "env_parse_enums", None),
+        )
+        custom_dotenv_settings = FamilyOpsDotEnvSettingsSource(
+            settings_cls,
+            env_file=getattr(dotenv_settings, "env_file", None),
+            env_file_encoding=getattr(dotenv_settings, "env_file_encoding", None),
+            case_sensitive=getattr(dotenv_settings, "case_sensitive", None),
+            env_prefix=getattr(dotenv_settings, "env_prefix", None),
+            env_nested_delimiter=getattr(dotenv_settings, "env_nested_delimiter", None),
+            env_ignore_empty=getattr(dotenv_settings, "env_ignore_empty", None),
+            env_parse_none_str=getattr(dotenv_settings, "env_parse_none_str", None),
+            env_parse_enums=getattr(dotenv_settings, "env_parse_enums", None),
+        )
+        return init_settings, custom_env_settings, custom_dotenv_settings, file_secret_settings
 
     class Config:
         # Resolve env files explicitly so imports behave the same from any cwd.
