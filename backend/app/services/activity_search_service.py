@@ -129,6 +129,7 @@ class ActivitySearchService:
             try:
                 return await self._search_source_domains(
                     search_query,
+                    location=location,
                     domains=domains,
                     max_results=max_results,
                 )
@@ -152,22 +153,29 @@ class ActivitySearchService:
         self,
         search_query: str,
         *,
+        location: Optional[str],
         domains: List[str],
         max_results: int,
     ) -> Dict[str, Any]:
         combined_results: List[Dict[str, Any]] = []
         combined_pages: List[Dict[str, Any]] = []
+        query_variants = self._build_activity_query_variants(search_query, location=location)
         per_domain_limit = max(1, min(max_results, 2))
 
         for domain in domains:
-            scoped_query = f"site:{domain} {search_query}".strip()
-            payload = await web_search_service.search(
-                scoped_query,
-                max_results=per_domain_limit,
-                fetch_pages=True,
-            )
-            combined_results.extend(payload.get("results") or [])
-            combined_pages.extend(payload.get("pages") or [])
+            for variant in query_variants:
+                scoped_query = f"site:{domain} {variant}".strip()
+                payload = await web_search_service.search(
+                    scoped_query,
+                    max_results=per_domain_limit,
+                    fetch_pages=True,
+                )
+                results = self._filter_allowed_web_items(payload.get("results") or [], [domain])
+                pages = self._filter_allowed_web_items(payload.get("pages") or [], [domain])
+                combined_results.extend(results)
+                combined_pages.extend(pages)
+                if results or pages:
+                    break
 
         return {
             "query": search_query,
@@ -250,6 +258,58 @@ class ActivitySearchService:
                 }
             )
         return pages
+
+    def _build_activity_query_variants(self, query: str, *, location: Optional[str]) -> List[str]:
+        text = " ".join((query or "").split()).lower()
+        location_value = (location or "").strip()
+
+        variants: List[str] = []
+        terms = [
+            "family activities",
+            "kids activities",
+            "days out",
+            "holiday activities",
+            "family events",
+            "outdoor family activities",
+        ]
+        for term in terms:
+            candidate = " ".join(part for part in [term, location_value] if part).strip()
+            if candidate and candidate not in variants:
+                variants.append(candidate)
+
+        if location_value and location_value not in variants:
+            variants.append(location_value)
+
+        return variants[:3] if variants else [query]
+
+    def _filter_allowed_web_items(self, items: List[Dict[str, Any]], domains: List[str]) -> List[Dict[str, Any]]:
+        allowed = [self._normalize_domain(domain) for domain in domains if self._normalize_domain(domain)]
+        if not allowed:
+            return list(items)
+
+        filtered: List[Dict[str, Any]] = []
+        for item in items:
+            item_domain = self._item_domain(item)
+            if not item_domain:
+                continue
+            if any(item_domain == domain or item_domain.endswith(f".{domain}") for domain in allowed):
+                filtered.append(item)
+        return filtered
+
+    def _item_domain(self, item: Dict[str, Any]) -> str:
+        domain = self._normalize_domain(item.get("domain") or "")
+        if domain:
+            return domain
+
+        url = str(item.get("url") or "").strip()
+        if not url:
+            return ""
+
+        parsed = urlparse(url if "://" in url else f"https://{url}")
+        host = parsed.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host
 
     def _dedupe_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         deduped: List[Dict[str, Any]] = []

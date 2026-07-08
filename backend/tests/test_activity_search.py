@@ -107,8 +107,11 @@ def test_activity_search_scopes_web_queries_to_domains(monkeypatch):
         )
     )
 
-    assert calls[0].startswith("site:nationaltrust.org.uk")
-    assert calls[1].startswith("site:nhm.ac.uk")
+    assert len(calls) == 2
+    assert calls[0].startswith("site:nationaltrust.org.uk ")
+    assert calls[1].startswith("site:nhm.ac.uk ")
+    assert all("london" in call.lower() for call in calls)
+    assert all("site:" in call for call in calls)
     assert result["results"][0]["source"] == "web_search"
     assert result["results"][0]["cost"] == "Free"
     assert result["results"][0]["transport"] == "By bus"
