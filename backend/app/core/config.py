@@ -17,6 +17,25 @@ class Settings(BaseSettings):
     # API
     api_prefix: str = "/api/v1"
     allowed_origins: List[str] = ["http://localhost:3000", "http://localhost:5000", "*"]
+    activity_search_source_domains: List[str] = [
+        "dayoutwiththekids.co.uk",
+        "nationaltrust.org.uk",
+        "english-heritage.org.uk",
+        "sciencemuseum.org.uk",
+        "nhm.ac.uk",
+        "britishmuseum.org",
+        "rspb.org.uk",
+        "wildlifetrusts.org",
+        "southbankcentre.co.uk",
+        "visitlondon.com",
+        "eventbrite.co.uk",
+        "primarytimes.co.uk",
+        "familiesonline.co.uk",
+        "artscouncil.org.uk",
+        "ngs.org.uk",
+        "familyinfo.buckinghamshire.gov.uk",
+        "timeout.com",
+    ]
 
     # Supabase
     supabase_url: str = ""
@@ -173,6 +192,36 @@ class Settings(BaseSettings):
                 "staging",
             }:
                 return False
+
+        return value
+
+    @field_validator("activity_search_source_domains", mode="before")
+    @classmethod
+    def parse_activity_search_source_domains(cls, value):
+        """
+        Accept comma, semicolon, newline, or JSON-style string lists for the
+        activity source allowlist.
+        """
+        if value is None:
+            return value
+
+        if isinstance(value, list):
+            return [str(item).strip().lower() for item in value if str(item).strip()]
+
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+
+            if raw.startswith("[") and raw.endswith("]"):
+                raw = raw[1:-1]
+
+            parts = []
+            for chunk in raw.replace(";", ",").replace("\n", ",").split(","):
+                cleaned = chunk.strip().strip('"').strip("'").lower()
+                if cleaned:
+                    parts.append(cleaned)
+            return parts
 
         return value
 

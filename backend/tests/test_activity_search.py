@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from app.agents.orchestrator import _activity_source_domains  # noqa: E402
 from app.services.activity_search_service import activity_search_service  # noqa: E402
 
 
@@ -110,3 +111,19 @@ def test_activity_search_scopes_web_queries_to_domains(monkeypatch):
     assert result["results"][0]["cost"] == "Free"
     assert result["results"][0]["transport"] == "By bus"
     assert result["results"][0]["time_taken"] == "45 mins"
+
+
+def test_activity_source_domains_include_family_sites():
+    domains = _activity_source_domains("Find family activities in London")
+
+    assert domains is not None
+    assert "ngs.org.uk" in domains
+    assert "nationaltrust.org.uk" in domains
+    assert "artscouncil.org.uk" in domains
+    assert "nhm.ac.uk" in domains
+    assert "britishmuseum.org" in domains
+    assert "dayoutwiththekids.co.uk" in domains
+    assert "timeout.com" in domains
+    assert "familiesonline.co.uk" in domains
+    assert "primarytimes.co.uk" in domains
+    assert "familyinfo.buckinghamshire.gov.uk" in domains

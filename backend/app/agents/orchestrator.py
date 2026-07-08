@@ -146,26 +146,6 @@ def _matches_any(text: str, phrases: List[str]) -> bool:
     return any(phrase in lowered for phrase in phrases)
 
 
-_KIDS_ACTIVITY_SOURCE_DOMAINS = [
-    "dayoutwiththekids.co.uk",
-    "nationaltrust.org.uk",
-    "english-heritage.org.uk",
-    "sciencemuseum.org.uk",
-    "nhm.ac.uk",
-    "britishmuseum.org",
-    "rspb.org.uk",
-    "wildlifetrusts.org",
-    "southbankcentre.co.uk",
-    "visitlondon.com",
-    "eventbrite.co.uk",
-    "primarytimes.co.uk",
-    "familiesonline.co.uk",
-    "artscouncil.org.uk",
-    "ngs.org.uk",
-    "familyinfo.buckinghamshire.gov.uk",
-]
-
-
 def _activity_source_domains(message: str) -> Optional[List[str]]:
     if not _matches_any(
         message,
@@ -183,7 +163,7 @@ def _activity_source_domains(message: str) -> Optional[List[str]]:
         ],
     ):
         return None
-    return _KIDS_ACTIVITY_SOURCE_DOMAINS
+    return settings.activity_search_source_domains
 
 
 def _format_activity_reply(location: Optional[str], results: List[Dict[str, Any]]) -> str:
