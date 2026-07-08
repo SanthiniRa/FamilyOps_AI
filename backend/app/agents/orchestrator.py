@@ -112,6 +112,23 @@ def _strip_trailing_time_words(value: str) -> str:
     return cleaned.strip(" .,!?:;")
 
 
+def _strip_trailing_date_clause(value: str) -> str:
+    cleaned = value.strip(" .,!?:;")
+    date_patterns = [
+        r"\b\d{4}-\d{2}-\d{2}\b",
+        r"\b\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\s+\d{4}\b",
+        r"\b[A-Za-z]{3,9}\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b",
+    ]
+    earliest = None
+    for pattern in date_patterns:
+        match = re.search(pattern, cleaned, re.IGNORECASE)
+        if match and (earliest is None or match.start() < earliest):
+            earliest = match.start()
+    if earliest is not None:
+        cleaned = cleaned[:earliest]
+    return cleaned.strip(" .,!?:;")
+
+
 def _extract_location_from_message(message: str) -> Optional[str]:
     text = message.strip()
     patterns = [
@@ -123,6 +140,7 @@ def _extract_location_from_message(message: str) -> Optional[str]:
         match = re.search(pattern, lower, re.IGNORECASE)
         if match:
             value = text[match.start(1): match.end(1)]
+            value = _strip_trailing_date_clause(value)
             return _strip_trailing_time_words(value)
     return None
 

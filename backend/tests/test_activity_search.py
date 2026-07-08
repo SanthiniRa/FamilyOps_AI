@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.agents.orchestrator import _activity_source_domains  # noqa: E402
+from app.agents.orchestrator import _activity_source_domains, _extract_location_from_message  # noqa: E402
 from app.services.activity_search_service import activity_search_service  # noqa: E402
 
 
@@ -129,3 +129,12 @@ def test_activity_source_domains_include_family_sites():
     assert "familiesonline.co.uk" in domains
     assert "primarytimes.co.uk" in domains
     assert "familyinfo.buckinghamshire.gov.uk" in domains
+
+
+def test_extract_location_trims_date_range():
+    message = (
+        "Find family-friendly activities in London from July 23, 2026 to August 30, 2026. "
+        "Use only the configured family activity websites in the app."
+    )
+
+    assert _extract_location_from_message(message) == "London"
