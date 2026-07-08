@@ -10,6 +10,7 @@ from app.core.auth import get_optional_current_user
 from app.core.ownership import get_owner_family_member_id, metadata_matches_owner
 from app.services.pantry_service import pantry_service
 from app.services.privacy import redact_pii_in_obj
+from app.core.logging import logger
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 _orchestrator = None
@@ -22,6 +23,22 @@ def _get_orchestrator():
 
         _orchestrator = orchestrator
     return _orchestrator
+
+
+def _serialize_user(user: Optional[User]) -> Optional[Dict[str, Any]]:
+    if not user:
+        return None
+
+    role = getattr(user, "role", None)
+    role_value = getattr(role, "value", role)
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": role_value,
+        "family_member_id": user.family_member_id,
+    }
 
 
 class AgentRequest(BaseModel):
@@ -202,37 +219,35 @@ async def chat_with_agent(
     start = time.time()
     owner_family_member_id = get_owner_family_member_id(current_user)
 
-    run = AgentRun(
-        agent_name="orchestrator",
-        status="running",
-        input_data={
-            "message": request.message,
-            "context": request.context,
-            "user": {
-                "id": current_user.id,
-                "email": current_user.email,
-                "full_name": current_user.full_name,
-                "role": current_user.role.value if current_user else None,
-                "family_member_id": current_user.family_member_id if current_user else None,
-            } if current_user else None,
-        },
-    )
-    db.add(run)
-    await db.flush()
-
     try:
+        run = AgentRun(
+            agent_name="orchestrator",
+            status="running",
+            input_data={
+                "message": request.message,
+                "context": request.context,
+                "user": _serialize_user(current_user),
+            },
+        )
+        db.add(run)
+        await db.flush()
+
         # Pre-fetch real household data for the LLM
         db_context = await _fetch_db_context(db, owner_family_member_id)
         merged_context = {
             **request.context,
             "db_context": db_context,
             "db": db,
-            "auth": {
-                "user_id": current_user.id,
-                "user_email": current_user.email,
-                "role": current_user.role.value if current_user else None,
-                "family_member_id": current_user.family_member_id if current_user else None,
-            } if current_user else None,
+            "auth": (
+                {
+                    "user_id": current_user.id,
+                    "user_email": current_user.email,
+                    "role": getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None)),
+                    "family_member_id": current_user.family_member_id,
+                }
+                if current_user
+                else None
+            ),
         }
 
         try:
@@ -266,9 +281,13 @@ async def chat_with_agent(
             "duration_ms": duration_ms,
         }
     except Exception as e:
-        run.status = "failed"
-        run.error = str(e)
-        run.completed_at = datetime.utcnow()
+        logger.exception("agent.chat_failed", error=str(e))
+        try:
+            run.status = "failed"  # type: ignore[name-defined]
+            run.error = str(e)  # type: ignore[name-defined]
+            run.completed_at = datetime.utcnow()  # type: ignore[name-defined]
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 
