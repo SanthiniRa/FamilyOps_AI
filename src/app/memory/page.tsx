@@ -157,12 +157,12 @@ export default function MemoryPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Upload a bill, recipe PDF, TXT, DOCX, or even a photo of the document.
-              The file is ingested into household memory so the text can be searched later.
+              Upload a bill, recipe PDF, diet sheet, shopping list, CSV export, TXT, DOCX, or even a photo of the document.
+              The file is ingested into household memory, and grocery-style lists can also seed grocery items automatically.
             </p>
             <input
               type="file"
-              accept=".pdf,.doc,.docx,.txt,.md,image/*"
+              accept=".pdf,.csv,.doc,.docx,.txt,.md,image/*"
               onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm"
             />
@@ -176,7 +176,7 @@ export default function MemoryPage() {
             {documentUpload && (
               <div className="rounded-md border bg-muted/40 p-3 text-sm">
                 <p className="font-medium">{documentUpload.filename} uploaded</p>
-                <p className="text-muted-foreground">Ingestion is running in the background and will add the text to memory search.</p>
+                <p className="text-muted-foreground">Ingestion is running in the background and will add the text to memory search. If the file looks like a grocery list, it may also create grocery items automatically.</p>
               </div>
             )}
           </CardContent>

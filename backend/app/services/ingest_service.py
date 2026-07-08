@@ -1,4 +1,6 @@
 from pathlib import Path
+import csv
+import re
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -6,7 +8,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
-from app.db.models import UploadedDocument
+from app.db.models import GroceryItem, GroceryList, UploadedDocument
 from app.services.rag_service import rag_service
 from app.services.rag_retrieval import split_semantic_chunks
 from app.core.logging import logger
@@ -66,6 +68,8 @@ async def ingest_document(uploaded_doc_id: str):
             pages = await _extract_text_from_docx(path)
         elif ext in (".txt", ".md"):
             pages = await _extract_text_from_txt(path)
+        elif ext == ".csv":
+            pages = await _extract_text_from_csv(path)
         elif ext in (".png", ".jpg", ".jpeg", ".tiff"):
             pages = await _extract_text_via_ocr(path)
         else:
@@ -110,6 +114,20 @@ async def ingest_document(uploaded_doc_id: str):
         doc = result.scalar_one_or_none()
 
         if doc:
+            grocery_import = {
+                "created": False,
+                "skipped": True,
+                "reason": "not_attempted",
+            }
+            try:
+                grocery_import = await _maybe_import_grocery_list_from_document(
+                    db=db,
+                    document=doc,
+                    pages=pages,
+                )
+            except Exception as e:
+                logger.exception("ingest.grocery_import_failed", error=str(e))
+
             doc.ingested = True
             doc.extra_metadata = {
                 **(doc.extra_metadata or {}),
@@ -119,6 +137,7 @@ async def ingest_document(uploaded_doc_id: str):
                 "pages": len(pages),
                 "content_type": doc.content_type,
                 "source": doc.source,
+                "grocery_import": grocery_import,
             }
             await db.commit()
 
@@ -127,6 +146,80 @@ async def ingest_document(uploaded_doc_id: str):
         document_id=uploaded_doc_id,
         stored_chunks=len(stored_ids)
     )
+
+
+async def _maybe_import_grocery_list_from_document(
+    db,
+    document: UploadedDocument,
+    pages: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    metadata = document.extra_metadata or {}
+    existing_import = metadata.get("grocery_import")
+    if isinstance(existing_import, dict) and existing_import.get("created"):
+        return existing_import
+
+    raw_text = "\n".join((page.get("text") or "") for page in pages or [])
+    parsed_items = _extract_grocery_items(raw_text)
+
+    if len(parsed_items) < 2:
+        return {
+            "created": False,
+            "skipped": True,
+            "reason": "not_enough_candidates",
+            "candidate_count": len(parsed_items),
+        }
+
+    unique_items: List[Dict[str, Any]] = []
+    seen_names: set[str] = set()
+    for item in parsed_items:
+        normalized_name = _normalize_item_name(item["name"])
+        if not normalized_name or normalized_name in seen_names:
+            continue
+        seen_names.add(normalized_name)
+        unique_items.append(item)
+
+    if len(unique_items) < 2:
+        return {
+            "created": False,
+            "skipped": True,
+            "reason": "not_enough_unique_items",
+            "candidate_count": len(parsed_items),
+            "added_count": len(unique_items),
+        }
+
+    list_name = _build_grocery_list_name(document)
+    grocery_list = GroceryList(
+        name=list_name,
+        status="active",
+        scheduled_date=datetime.utcnow(),
+    )
+    db.add(grocery_list)
+    await db.flush()
+
+    added_items: List[Dict[str, Any]] = []
+
+    for item in unique_items:
+        db.add(
+            GroceryItem(
+                list_id=grocery_list.id,
+                name=item["name"],
+                category=item.get("category"),
+                quantity=item.get("quantity", 1),
+                unit=item.get("unit"),
+                notes=item.get("notes"),
+                added_by="memory_import",
+            )
+        )
+        added_items.append(item)
+
+    return {
+        "created": True,
+        "skipped": False,
+        "list_id": grocery_list.id,
+        "list_name": grocery_list.name,
+        "added_count": len(added_items),
+        "items": added_items,
+    }
 
 
 async def _extract_text_from_pdf(path: Path) -> List[Dict[str, Any]]:
@@ -197,6 +290,25 @@ async def _extract_text_from_txt(path: Path) -> List[Dict[str, Any]]:
         return [{"page": 1, "text": ""}]
 
 
+async def _extract_text_from_csv(path: Path) -> List[Dict[str, Any]]:
+    try:
+        rows: List[Dict[str, Any]] = []
+        with path.open("r", encoding="utf-8", errors="ignore", newline="") as handle:
+            reader = csv.reader(handle)
+            for row_index, row in enumerate(reader):
+                cleaned = [cell.strip() for cell in row if cell and cell.strip()]
+                if not cleaned:
+                    continue
+                lowered = [cell.lower() for cell in cleaned]
+                if row_index == 0 and _looks_like_csv_header(lowered):
+                    continue
+                rows.append({"page": 1, "text": " | ".join(cleaned)})
+        return rows or [{"page": 1, "text": ""}]
+    except Exception as e:
+        logger.exception("ingest.csv_parse_failed", error=str(e), path=str(path))
+        return [{"page": 1, "text": ""}]
+
+
 async def _extract_text_via_ocr(path: Path) -> List[Dict[str, Any]]:
     if Image is None or pytesseract is None:
         raise RuntimeError("Pillow and pytesseract are required for OCR")
@@ -239,4 +351,238 @@ def _chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str
         text,
         max_words=min(chunk_size, settings.rag_document_chunk_words),
         overlap=min(overlap, settings.rag_document_chunk_overlap),
+    )
+
+
+def _normalize_item_name(value: str) -> str:
+    return " ".join((value or "").strip().lower().split())
+
+
+def _build_grocery_list_name(document: UploadedDocument) -> str:
+    base_name = (document.filename or "uploaded document").strip()
+    base_name = re.sub(r"\.[a-z0-9]{1,6}$", "", base_name, flags=re.IGNORECASE)
+    if len(base_name) > 60:
+        base_name = base_name[:57].rstrip() + "..."
+    return f"Memory Grocery - {base_name}"
+
+
+def _extract_grocery_items(text: str) -> List[Dict[str, Any]]:
+    candidates: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for raw_line in re.split(r"[\r\n]+", text or ""):
+        for segment in _split_document_segment(raw_line):
+            parsed = _parse_grocery_line(segment)
+            if not parsed:
+                continue
+            normalized_name = _normalize_item_name(parsed["name"])
+            if not normalized_name or normalized_name in seen:
+                continue
+            seen.add(normalized_name)
+            candidates.append(parsed)
+
+    return candidates
+
+
+def _split_document_segment(line: str) -> List[str]:
+    cleaned = _clean_document_line(line)
+    if not cleaned:
+        return []
+
+    if ";" in cleaned:
+        parts = [part.strip() for part in cleaned.split(";") if part.strip()]
+        if len(parts) > 1:
+            return parts
+
+    return [cleaned]
+
+
+def _clean_document_line(line: str) -> str:
+    cleaned = re.sub(r"^\s*(?:[-*•●▪▫]|[\d]+[.)]|[a-zA-Z][.)])\s*", "", (line or "").strip())
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _parse_grocery_line(line: str) -> Dict[str, Any] | None:
+    if not line:
+        return None
+
+    lowered = line.strip().lower()
+    if lowered in {
+        "grocery list",
+        "shopping list",
+        "weekly groceries",
+        "weekly grocery list",
+        "meal plan",
+        "diet plan",
+        "ingredients",
+        "notes",
+        "pantry",
+        "house memory",
+    }:
+        return None
+
+    candidate = line
+    if ":" in candidate:
+        left, right = candidate.split(":", 1)
+        if left.strip().lower() in {
+            "breakfast",
+            "lunch",
+            "dinner",
+            "snacks",
+            "shopping",
+            "groceries",
+            "ingredients",
+            "weekly groceries",
+            "diet",
+            "meal plan",
+        } and right.strip():
+            candidate = right.strip()
+
+    parsed = _parse_structured_grocery_line(candidate)
+    if parsed:
+        return parsed
+
+    words = candidate.split()
+    if len(words) > 8:
+        return None
+    if any(char.isdigit() for char in candidate):
+        return None
+
+    name = candidate.strip(" -:;,.")
+    if not name:
+        return None
+
+    return {
+        "name": _format_item_name(name),
+        "quantity": 1,
+        "unit": None,
+        "category": _infer_grocery_category(name),
+        "notes": candidate.strip(),
+    }
+
+
+def _parse_structured_grocery_line(line: str) -> Dict[str, Any] | None:
+    if not line:
+        return None
+
+    if "|" in line:
+        parts = [part.strip() for part in line.split("|") if part.strip()]
+        if len(parts) >= 2:
+            quantity = _parse_quantity(parts[1])
+            if quantity is not None:
+                return {
+                    "name": _format_item_name(parts[0]),
+                    "quantity": quantity,
+                    "unit": parts[2].strip() if len(parts) >= 3 and parts[2].strip() else None,
+                    "category": parts[3].strip() if len(parts) >= 4 and parts[3].strip() else _infer_grocery_category(parts[0]),
+                    "notes": line.strip(),
+                }
+
+    if "," in line and re.search(r"\d", line):
+        parts = [part.strip() for part in line.split(",") if part.strip()]
+        if len(parts) >= 2:
+            quantity = _parse_quantity(parts[1])
+            if quantity is not None:
+                return {
+                    "name": _format_item_name(parts[0]),
+                    "quantity": quantity,
+                    "unit": parts[2].strip() if len(parts) >= 3 and parts[2].strip() else None,
+                    "category": parts[3].strip() if len(parts) >= 4 and parts[3].strip() else _infer_grocery_category(parts[0]),
+                    "notes": line.strip(),
+                }
+
+    patterns = [
+        re.compile(r"^(?P<name>.+?)\s*[x×]\s*(?P<quantity>\d+(?:[.,]\d+)?)(?:\s*(?P<unit>[A-Za-z][A-Za-z0-9/%.-]*))?(?:\s*-\s*(?P<category>.+))?$"),
+        re.compile(r"^(?P<name>.+?)\s+(?P<quantity>\d+(?:[.,]\d+)?)(?:\s*(?P<unit>[A-Za-z][A-Za-z0-9/%.-]*))?(?:\s*-\s*(?P<category>.+))?$"),
+        re.compile(r"^(?P<quantity>\d+(?:[.,]\d+)?)\s*(?P<unit>[A-Za-z][A-Za-z0-9/%.-]*)?\s+(?P<name>.+)$"),
+    ]
+
+    for pattern in patterns:
+        match = pattern.match(line)
+        if not match:
+            continue
+
+        name = match.groupdict().get("name")
+        if not name:
+            continue
+
+        quantity = _parse_quantity(match.groupdict().get("quantity"))
+        if quantity is None:
+            continue
+
+        unit = match.groupdict().get("unit")
+        category = match.groupdict().get("category") or _infer_grocery_category(name)
+        return {
+            "name": _format_item_name(name),
+            "quantity": quantity,
+            "unit": unit.strip() if unit and unit.strip() else None,
+            "category": category.strip() if isinstance(category, str) and category.strip() else _infer_grocery_category(name),
+            "notes": line.strip(),
+        }
+
+    return None
+
+
+def _parse_quantity(value: Any) -> float | None:
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    text = text.replace(",", ".")
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _format_item_name(value: str) -> str:
+    text = " ".join((value or "").strip().split())
+    return text.title()
+
+
+def _infer_grocery_category(value: str) -> str:
+    lowered = _normalize_item_name(value)
+    keyword_map = [
+        ("produce", ["fruit", "banana", "apple", "berry", "orange", "tomato", "onion", "spinach", "lettuce", "salad", "carrot", "potato", "vegetable"]),
+        ("dairy", ["milk", "yogurt", "cheese", "butter", "cream", "paneer"]),
+        ("protein", ["chicken", "turkey", "beef", "fish", "salmon", "tuna", "egg", "eggs", "tofu", "lentil", "beans", "bean"]),
+        ("pantry", ["rice", "pasta", "flour", "oats", "cereal", "oil", "sauce", "spice", "sugar", "salt"]),
+        ("bakery", ["bread", "bagel", "bun", "roll", "tortilla"]),
+        ("frozen", ["frozen", "ice cream"]),
+        ("beverages", ["juice", "tea", "coffee", "water", "soda", "milkshake"]),
+        ("snacks", ["snack", "cracker", "chip", "nuts", "peanut butter"]),
+    ]
+
+    for category, keywords in keyword_map:
+        if any(keyword in lowered for keyword in keywords):
+            return category.title()
+
+    return "Groceries"
+
+
+def _looks_like_csv_header(values: List[str]) -> bool:
+    header_tokens = {
+        "item",
+        "items",
+        "name",
+        "quantity",
+        "qty",
+        "amount",
+        "unit",
+        "category",
+        "notes",
+        "price",
+        "cost",
+        "label",
+    }
+    normalized = {value.strip().lower() for value in values if value.strip()}
+    if not normalized:
+        return False
+    return normalized.issubset(header_tokens) or (
+        {"item", "quantity"}.issubset(normalized)
+        or {"name", "qty"}.issubset(normalized)
     )

@@ -106,6 +106,30 @@ function addNutrition(target: Record<string, number>, source: Record<string, num
   });
 }
 
+function parseIngredientLine(line: string) {
+  const delimiter = line.includes("|") ? "|" : line.includes(",") ? "," : "";
+  const parts = delimiter
+    ? line
+        .split(delimiter)
+        .map((part) => part.trim())
+        .filter(Boolean)
+    : [line.trim()];
+
+  if (parts.length <= 1) {
+    return { name: line.trim() };
+  }
+
+  const [name, quantityRaw, unit, category] = parts;
+  const quantity = Number(quantityRaw);
+
+  return {
+    name,
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    unit: unit || null,
+    category: category || null,
+  };
+}
+
 function normalizeDailyNutrition(value: any) {
   return {
     meals: MEALS.reduce((acc, meal) => {
@@ -226,7 +250,7 @@ export default function MealsPage() {
           .split("\n")
           .map((line) => line.trim())
           .filter(Boolean)
-          .map((name) => ({ name })),
+          .map(parseIngredientLine),
         instructions: recipeForm.instructions
           .split("\n")
           .map((line) => line.trim())
@@ -431,7 +455,7 @@ export default function MealsPage() {
               className="md:col-span-2"
             />
             <textarea
-              placeholder="Ingredients, one per line"
+              placeholder="Ingredients, one per line. Use: chicken breast | 200 | g | protein"
               value={recipeForm.ingredients}
               onChange={(e) => setRecipeForm({ ...recipeForm, ingredients: e.target.value })}
               className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:col-span-2"
